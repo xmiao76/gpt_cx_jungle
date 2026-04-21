@@ -1,47 +1,58 @@
 Act as a senior software architect and technical lead.
 
-Build a Windows desktop Jungle board game application with a GUI and built-in game engine so a human can play against the computer on a visual Jungle board. Use the standard Jungle / Dou Shou Qi rules described on this page as the baseline game specification:
+Create a step-by-step development plan for a Windows desktop Jungle board game application with a GUI and built-in AI so a human can play against the computer on a visual board.
+
+Use the standard Jungle / Dou Shou Qi rules from this page as the main game specification and reference:
 https://en.wikipedia.org/wiki/Jungle_(board_game)
 
-Choose the best implementation approach and provide a step-by-step plan covering development, testing, and release.
+If the board layout, terrain layout, or initial piece positions are unclear from the wiki page, also refer to:
+https://veryspecial.us/free-downloads/AncientChess.com-DouShouQi.pdf
+
+Do not restate the full rules in detail unless needed. Instead, refer to the source materials above and build the plan around implementing the ruleset correctly and consistently. If the sources mention ambiguous rules or variants, identify them, choose one clear standard interpretation, document it, and keep the implementation consistent.
 
 Requirements:
-Choose the best programming language, architecture, and Windows GUI framework. Include all modules needed for a complete Jungle application. You may study existing engine designs, but all source code must be newly written for this application. Phase 1 must deliver a working GUI version where a human can play against the engine. The engine must be fast enough for a smooth, responsive experience. The app must be easy to build, run, and test locally. Testing must be integrated throughout development. Automated tests must be created and maintained during development. Defects found in testing or real gameplay must be fixed and retested until stable. The final application must complete full Jungle games correctly. AI-vs-AI mode is desirable if practical.
+- Choose the best programming language, architecture, Windows GUI framework, and AI approach.
+- All source code must be newly written for this application.
+- Phase 1 must deliver a working GUI where a human can play against the AI.
+- The engine must be responsive and suitable for smooth local play.
+- The app must be easy to build, run, test, and package locally.
+- Testing must be integrated throughout development.
+- Automated tests must be created and maintained during development.
+- Bugs found in testing or gameplay must be fixed and regression-tested until stable.
+- The final application must complete full Jungle games correctly.
+- AI-vs-AI mode is desirable if practical.
+
+UI requirements:
+- The final UI must be polished and attractive, not just functional.
+- The board should visually show river, trap, den, land, and other terrain clearly.
+- Each piece should look like its animal, not just a letter or plain marker.
+- Include good usability details such as piece selection highlights, legal move indicators, capture feedback, turn display, and win/loss messaging.
+- Support flipping the board upside down as a view option. This feature must only rotate/flip the visual board orientation for display. It must not change the game state, must not swap sides internally, and must not change whose turn it is.
+- Avoid placeholder-style visuals in the final release except optionally in debug mode.
 
 Release requirements:
-The final build must produce a packaged .exe in a release folder. The release folder must also contain a README.txt explaining launch, gameplay, controls, and important notes. The packaged release .exe must be tested after packaging, not only in development. Release validation must confirm the .exe in the release folder starts and can be used to play a real Jungle game. Any defects found in the packaged release version must be fixed, rebuilt, and retested until the release executable passes all required checks. Save this instruction prompt as prompt.md in the codebase to keep a record of the requirements.
-
-The Jungle program must fully support the standard rules from the above Wikipedia page, including:
-- 7×9 board layout
-- all special board areas: dens, traps, and rivers
-- all 8 animal pieces per side with correct relative ranks
-- legal movement validation for every piece
-- turn handling and win/loss detection
-- den-entry win condition
-- capture-all-opponent-pieces win condition if supported by the chosen ruleset
-- rat water movement rules
-- lion and tiger river-jump rules
-- blocking of lion/tiger jumps by a rat in the river
-- correct capture restrictions involving rat, elephant, water, land, traps, and rank comparisons
-- trap behavior, including temporary rank reduction while in the opponent’s trap
-- prevention of illegal self-den entry
-- clear handling of any ambiguous or variant rules by explicitly documenting the selected standard ruleset before implementation
-
-If rule ambiguities or common variants are found, choose one clearly documented standard ruleset based on the cited Wikipedia page and keep the implementation consistent with that ruleset. Call out any optional variants separately, but do not let them delay the main playable release.
+- Produce a packaged .exe in a release folder.
+- The release folder must also include README.txt or README.md with launch, gameplay, controls, notes, and a clear statement identifying which model and which code agent were used to complete the task.
+- The packaged .exe must be tested after packaging, not only during development.
+- If packaging defects are found, fix, rebuild, and retest until the packaged executable passes.
+- Save this prompt as prompt.md in the codebase.
 
 Please provide:
-tech stack and justification; architecture; module breakdown and responsibilities; phased roadmap; test plan for each phase; automated testing approach; AI/engine approach; performance optimization; local build, run, and test workflow; defect-fix and regression-test workflow; packaging plan for the executable; release validation plan for the packaged .exe; expected contents of the release folder; suggested contents of README.txt; where and how prompt.md should be stored in the codebase; and completion criteria.
+- recommended tech stack and justification
+- architecture and module breakdown
+- phased roadmap
+- test plan for each phase
+- automated testing strategy
+- AI/engine strategy
+- performance optimization plan
+- local build, run, and test workflow
+- bug-fix and regression-test workflow
+- packaging plan
+- release validation plan
+- expected release folder contents
+- suggested README.txt or README.md contents
+- where prompt.md should be stored
+- completion criteria
 
-Also include recommendations for:
-- board representation and game-state modeling
-- move generation and legal-move filtering
-- rules engine design for terrain-aware movement and capture logic
-- AI search strategy suitable for Jungle (for example minimax/alpha-beta or another appropriate approach)
-- evaluation function design for Jungle, including piece rank, position, mobility, den pressure, trap control, and tactical threats
-- save/load support if practical
-- undo/redo if practical
-- move history and basic game logging
-- debugging tools or developer diagnostics for validating rules correctness
+Completion is only achieved when the game is playable and stable, completes full games correctly, passes required automated tests, includes a tested packaged .exe in the release folder, includes README.txt or README.md with the model/code-agent statement, and includes prompt.md in the codebase.
 
-Completion criteria:
-The task is complete only when the application is playable and stable, can complete full Jungle games without crashes or rule errors, all required automated tests pass, the executable is packaged into the release folder, the packaged release .exe is tested directly from the release folder, the tested release executable can launch and play a real game, the release folder contains both the runnable .exe and a README.txt, and the codebase includes prompt.md containing this task prompt.

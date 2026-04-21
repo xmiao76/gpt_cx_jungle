@@ -17,6 +17,8 @@ DIFFICULTY_LIMITS = {
     "hard": 1800,
 }
 
+HUMAN_SIDE = Side.BLUE
+
 
 class AppController:
     def __init__(self, difficulty: str = "medium") -> None:
@@ -62,7 +64,7 @@ class AppController:
             return
         piece = self.game.state.board[index]
         if self.selected_index is None:
-            if piece is None or piece.side is not Side.BLUE:
+            if piece is None or piece.side is not HUMAN_SIDE:
                 return
             self.selected_index = index
             self.legal_targets = {move.destination for move in self.game.list_moves() if move.origin == index}
@@ -78,7 +80,7 @@ class AppController:
         try:
             self.game.apply_coordinates(self.selected_index, index)
         except ValueError:
-            if piece is not None and piece.side is Side.BLUE:
+            if piece is not None and piece.side is HUMAN_SIDE:
                 self.selected_index = index
                 self.legal_targets = {move.destination for move in self.game.list_moves() if move.origin == index}
             else:
@@ -97,7 +99,7 @@ class AppController:
         if self.game.state.winner is not None:
             self.refresh()
             return
-        if self.game.state.side_to_move is Side.RED or self.ai_vs_ai_enabled:
+        if self.game.state.side_to_move is HUMAN_SIDE.opponent or self.ai_vs_ai_enabled:
             self.start_ai_turn()
 
     def start_ai_turn(self) -> None:
@@ -134,7 +136,7 @@ class AppController:
         if self.thinking:
             return
         if self.game.undo():
-            if self.game.state.side_to_move is Side.RED and self.game.undo():
+            if self.game.state.side_to_move is HUMAN_SIDE.opponent and self.game.undo():
                 pass
             self.selected_index = None
             self.legal_targets.clear()
@@ -188,7 +190,7 @@ def run_smoke_validation() -> int:
     red_ai = AlphaBetaAI(60)
     turns = 0
     while game.state.winner is None and turns < 200:
-        ai = blue_ai if game.state.side_to_move is Side.BLUE else red_ai
+        ai = blue_ai if game.state.side_to_move is HUMAN_SIDE else red_ai
         result = ai.choose_move(game.state)
         if result.move is None:
             break
@@ -208,11 +210,49 @@ def run_smoke_validation() -> int:
     return 0 if turns > 0 else 1
 
 
+def run_window_fit_probe(startup_geometry: str, resize_geometry: str) -> int:
+    controller = AppController()
+    app = controller.app
+
+    def apply_geometry(geometry: str) -> dict[str, bool | int]:
+        app.geometry(geometry)
+        app.update()
+        app.update_idletasks()
+        app.update()
+        return app.window_fit_probe()
+
+    startup = apply_geometry(startup_geometry)
+    resized = apply_geometry(resize_geometry)
+    app.destroy()
+
+    for label, probe in (("startup", startup), ("resized", resized)):
+        print(
+            "\n".join(
+                [
+                    f"{label}_window={probe['window_width']}x{probe['window_height']}",
+                    f"{label}_board_bottom_visible={probe['board_bottom_visible']}",
+                    f"{label}_panel_bottom_visible={probe['panel_bottom_visible']}",
+                    f"{label}_click_mapping_ok={probe['click_mapping_ok']}",
+                ]
+            )
+        )
+
+    return 0 if startup["fits"] and resized["fits"] else 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Jungle desktop game")
     parser.add_argument("--smoke-test", action="store_true", help="Run a packaged smoke test without opening the GUI.")
+    parser.add_argument(
+        "--window-fit-probe",
+        nargs=2,
+        metavar=("STARTUP_GEOMETRY", "RESIZE_GEOMETRY"),
+        help="Open the normal GUI, probe layout fit at startup geometry and after manual resize, then exit.",
+    )
     args = parser.parse_args()
     if args.smoke_test:
         raise SystemExit(run_smoke_validation())
+    if args.window_fit_probe:
+        raise SystemExit(run_window_fit_probe(args.window_fit_probe[0], args.window_fit_probe[1]))
     controller = AppController()
     controller.run()

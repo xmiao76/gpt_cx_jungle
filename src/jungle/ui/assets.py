@@ -5,6 +5,7 @@ import tkinter as tk
 from pathlib import Path
 
 from jungle.domain import PieceType, Side
+from jungle.ui.theme import SUPPORTED_ASSET_SCALES
 
 
 ASSET_DIRNAME = "assets"
@@ -52,21 +53,38 @@ def required_asset_paths() -> list[Path]:
 class AssetLoader:
     def __init__(self) -> None:
         self.base_path = asset_base_path()
-        self._cache: dict[str, tk.PhotoImage] = {}
+        self._base_cache: dict[str, tk.PhotoImage] = {}
+        self._scaled_cache: dict[tuple[str, tuple[int, int]], tk.PhotoImage] = {}
 
     def path_for(self, filename: str) -> Path:
         return self.base_path / filename
 
-    def image(self, filename: str) -> tk.PhotoImage:
-        if filename not in self._cache:
+    def _base_image(self, filename: str) -> tk.PhotoImage:
+        if filename not in self._base_cache:
             path = self.path_for(filename)
             if not path.exists():
                 raise FileNotFoundError(f"Missing UI asset: {path}")
-            self._cache[filename] = tk.PhotoImage(file=str(path))
-        return self._cache[filename]
+            self._base_cache[filename] = tk.PhotoImage(file=str(path))
+        return self._base_cache[filename]
 
-    def board(self, name: str) -> tk.PhotoImage:
-        return self.image(BOARD_ASSETS[name])
+    def image(self, filename: str, scale_key: tuple[int, int] = (1, 1)) -> tk.PhotoImage:
+        cache_key = (filename, scale_key)
+        if cache_key not in self._scaled_cache:
+            base_image = self._base_image(filename)
+            self._scaled_cache[cache_key] = scale_image(base_image, scale_key)
+        return self._scaled_cache[cache_key]
 
-    def piece(self, side: Side, kind: PieceType) -> tk.PhotoImage:
-        return self.image(PIECE_ASSETS[(side, kind)])
+    def board(self, name: str, scale_key: tuple[int, int] = (1, 1)) -> tk.PhotoImage:
+        return self.image(BOARD_ASSETS[name], scale_key)
+
+    def piece(self, side: Side, kind: PieceType, scale_key: tuple[int, int] = (1, 1)) -> tk.PhotoImage:
+        return self.image(PIECE_ASSETS[(side, kind)], scale_key)
+
+
+def scale_image(image: tk.PhotoImage, scale_key: tuple[int, int]) -> tk.PhotoImage:
+    if scale_key not in SUPPORTED_ASSET_SCALES:
+        raise ValueError(f"Unsupported asset scale: {scale_key}")
+    numerator, denominator = scale_key
+    if numerator == denominator:
+        return image
+    return image.zoom(numerator, numerator).subsample(denominator, denominator)

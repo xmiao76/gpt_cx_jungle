@@ -80,22 +80,22 @@ def river_path(origin: int, destination: int) -> list[int]:
 
 
 INITIAL_PIECES: dict[int, Piece] = {
-    Position(6, 0).index: Piece(Side.BLUE, PieceType.LION),
-    Position(8, 6).index: Piece(Side.BLUE, PieceType.TIGER),
-    Position(6, 2).index: Piece(Side.BLUE, PieceType.DOG),
-    Position(6, 4).index: Piece(Side.BLUE, PieceType.CAT),
-    Position(8, 0).index: Piece(Side.BLUE, PieceType.ELEPHANT),
-    Position(8, 2).index: Piece(Side.BLUE, PieceType.WOLF),
-    Position(8, 4).index: Piece(Side.BLUE, PieceType.LEOPARD),
+    Position(6, 0).index: Piece(Side.BLUE, PieceType.ELEPHANT),
+    Position(6, 2).index: Piece(Side.BLUE, PieceType.WOLF),
+    Position(6, 4).index: Piece(Side.BLUE, PieceType.LEOPARD),
     Position(6, 6).index: Piece(Side.BLUE, PieceType.RAT),
-    Position(2, 6).index: Piece(Side.RED, PieceType.LION),
-    Position(0, 0).index: Piece(Side.RED, PieceType.TIGER),
-    Position(2, 4).index: Piece(Side.RED, PieceType.DOG),
-    Position(2, 2).index: Piece(Side.RED, PieceType.CAT),
-    Position(0, 6).index: Piece(Side.RED, PieceType.ELEPHANT),
-    Position(0, 4).index: Piece(Side.RED, PieceType.WOLF),
-    Position(0, 2).index: Piece(Side.RED, PieceType.LEOPARD),
+    Position(7, 1).index: Piece(Side.BLUE, PieceType.CAT),
+    Position(7, 5).index: Piece(Side.BLUE, PieceType.DOG),
+    Position(8, 0).index: Piece(Side.BLUE, PieceType.TIGER),
+    Position(8, 6).index: Piece(Side.BLUE, PieceType.LION),
     Position(2, 0).index: Piece(Side.RED, PieceType.RAT),
+    Position(2, 2).index: Piece(Side.RED, PieceType.LEOPARD),
+    Position(2, 4).index: Piece(Side.RED, PieceType.WOLF),
+    Position(2, 6).index: Piece(Side.RED, PieceType.ELEPHANT),
+    Position(1, 1).index: Piece(Side.RED, PieceType.DOG),
+    Position(1, 5).index: Piece(Side.RED, PieceType.CAT),
+    Position(0, 0).index: Piece(Side.RED, PieceType.LION),
+    Position(0, 6).index: Piece(Side.RED, PieceType.TIGER),
 }
 
 

@@ -5,15 +5,24 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tools.smoke_release import run_packaged_smoke
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 BUILD = ROOT / "build"
 RELEASE = ROOT / "release"
 SPEC = ROOT / "Jungle.spec"
+MODEL_NAME = "gpt-5.4"
+AGENT_NAME = "Codex"
+REQUIRED_DISCLOSURES = (
+    f"Model used: {MODEL_NAME}",
+    f"Code agent used: {AGENT_NAME}",
+)
 
 
-README_TEXT = """Jungle
+def build_release_readme(model_name: str = MODEL_NAME, agent_name: str = AGENT_NAME) -> str:
+    return f"""Jungle
 
 Launch
 - Double-click Jungle.exe to start the game.
@@ -39,11 +48,13 @@ Important Notes
 - This build follows the documented ruleset in docs/ruleset.md.
 - The packaged build also supports Jungle.exe --smoke-test for release validation.
 - Windows Defender may pause first launch briefly while it scans the executable.
+- Model used: {model_name}
+- Code agent used: {agent_name}
 """
 
 
-def write_spec() -> None:
-    SPEC.write_text(
+def write_spec(spec_path: Path = SPEC) -> None:
+    spec_path.write_text(
         """
 from PyInstaller.utils.hooks import collect_submodules
 
@@ -89,20 +100,53 @@ coll = COLLECT(
     )
 
 
-def clean() -> None:
-    for path in (DIST, BUILD, RELEASE):
+def clean(paths: tuple[Path, ...] = (DIST, BUILD, RELEASE)) -> None:
+    for path in paths:
         if path.exists():
             shutil.rmtree(path)
 
 
+def generate_assets() -> None:
+    subprocess.run([sys.executable, "-m", "tools.generate_ui_assets"], cwd=ROOT, check=True)
+
+
+def build_bundle(spec_path: Path = SPEC) -> Path:
+    write_spec(spec_path)
+    subprocess.run([sys.executable, "-m", "PyInstaller", str(spec_path)], cwd=ROOT, check=True)
+    return DIST / "Jungle"
+
+
+def assemble_release(bundle_dir: Path, release_dir: Path = RELEASE) -> None:
+    shutil.copytree(bundle_dir, release_dir)
+
+
+def write_release_readme(release_dir: Path = RELEASE) -> Path:
+    readme_path = release_dir / "README.txt"
+    readme_path.write_text(build_release_readme(), encoding="utf-8")
+    return readme_path
+
+
+def verify_release_artifacts(release_dir: Path = RELEASE) -> None:
+    readme_path = release_dir / "README.txt"
+    readme = readme_path.read_text(encoding="utf-8")
+    for required in REQUIRED_DISCLOSURES:
+        if required not in readme:
+            raise RuntimeError(f"Missing release README requirement: {required}")
+    if not (release_dir / "Jungle.exe").exists():
+        raise RuntimeError("release/Jungle.exe was not created")
+    if not (ROOT / "prompt.md").exists():
+        raise RuntimeError("prompt.md must remain in the repository root")
+
+
 def main() -> None:
     clean()
-    subprocess.run([sys.executable, "-m", "tools.generate_ui_assets"], cwd=ROOT, check=True)
-    write_spec()
-    subprocess.run([sys.executable, "-m", "PyInstaller", str(SPEC)], cwd=ROOT, check=True)
-    built = DIST / "Jungle"
-    shutil.copytree(built, RELEASE)
-    (RELEASE / "README.txt").write_text(README_TEXT, encoding="utf-8")
+    generate_assets()
+    built = build_bundle()
+    assemble_release(built)
+    write_release_readme()
+    result_file = run_packaged_smoke(RELEASE)
+    verify_release_artifacts()
+    print(result_file.read_text(encoding="utf-8"))
     print(f"Release created at {RELEASE}")
 
 

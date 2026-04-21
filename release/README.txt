@@ -24,3 +24,5 @@ Important Notes
 - This build follows the documented ruleset in docs/ruleset.md.
 - The packaged build also supports Jungle.exe --smoke-test for release validation.
 - Windows Defender may pause first launch briefly while it scans the executable.
+- Model used: gpt-5.4
+- Code agent used: Codex

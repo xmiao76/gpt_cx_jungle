@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from jungle.domain import (
     BLUE_DEN,
+    BLUE_TRAPS,
     RED_DEN,
+    RED_TRAPS,
     WATER,
     Move,
     Piece,
@@ -29,6 +31,36 @@ def test_initial_state_has_16_pieces() -> None:
     state = initial_state()
     assert sum(piece is not None for piece in state.board) == 16
     assert state.side_to_move is Side.BLUE
+
+
+def test_initial_state_matches_standard_starting_positions() -> None:
+    state = initial_state()
+    expected = {
+        Position(0, 0).index: Piece(Side.RED, PieceType.LION),
+        Position(0, 6).index: Piece(Side.RED, PieceType.TIGER),
+        Position(1, 1).index: Piece(Side.RED, PieceType.DOG),
+        Position(1, 5).index: Piece(Side.RED, PieceType.CAT),
+        Position(2, 0).index: Piece(Side.RED, PieceType.RAT),
+        Position(2, 2).index: Piece(Side.RED, PieceType.LEOPARD),
+        Position(2, 4).index: Piece(Side.RED, PieceType.WOLF),
+        Position(2, 6).index: Piece(Side.RED, PieceType.ELEPHANT),
+        Position(6, 0).index: Piece(Side.BLUE, PieceType.ELEPHANT),
+        Position(6, 2).index: Piece(Side.BLUE, PieceType.WOLF),
+        Position(6, 4).index: Piece(Side.BLUE, PieceType.LEOPARD),
+        Position(6, 6).index: Piece(Side.BLUE, PieceType.RAT),
+        Position(7, 1).index: Piece(Side.BLUE, PieceType.CAT),
+        Position(7, 5).index: Piece(Side.BLUE, PieceType.DOG),
+        Position(8, 0).index: Piece(Side.BLUE, PieceType.TIGER),
+        Position(8, 6).index: Piece(Side.BLUE, PieceType.LION),
+    }
+    actual = {index: piece for index, piece in enumerate(state.board) if piece is not None}
+    assert actual == expected
+
+
+def test_initial_state_pieces_do_not_start_in_dens_traps_or_water() -> None:
+    blocked = WATER | BLUE_TRAPS | RED_TRAPS | {BLUE_DEN, RED_DEN}
+    state = initial_state()
+    assert all(piece is None for index, piece in enumerate(state.board) if index in blocked)
 
 
 def test_rat_can_enter_water_but_cat_cannot() -> None:
