@@ -14,6 +14,7 @@ from jungle.domain import (
     WATER,
     PieceType,
     Position,
+    Side,
 )
 from jungle.engine import Game
 from jungle.rules import effective_rank, generate_piece_moves
@@ -58,11 +59,17 @@ def canvas_origin_for_index(
 
 
 class JungleApp(tk.Tk):
+    DIFFICULTY_OPTIONS = ("easy", "medium", "hard")
+    STARTER_OPTIONS = (
+        ("player", "Player starts"),
+        ("ai", "AI starts"),
+    )
+
     def __init__(
         self,
         game: Game,
         on_square: Callable[[int], None],
-        on_new_game: Callable[[str], None],
+        on_new_game: Callable[[str, bool], None],
         on_undo: Callable[[], None],
         on_redo: Callable[[], None],
         on_save: Callable[[str], None],
@@ -90,6 +97,7 @@ class JungleApp(tk.Tk):
         self.legal_targets: set[int] = set()
         self.diagnostics_enabled = False
         self.is_board_flipped = False
+        self.human_side = Side.BLUE
         self.status_var = tk.StringVar()
         self.ai_var = tk.StringVar(value="Difficulty: medium")
         self.info_var = tk.StringVar()
@@ -269,7 +277,7 @@ class JungleApp(tk.Tk):
             font=("Georgia", 14, "bold"),
         ).pack(padx=16, pady=(16, 6))
         value = tk.StringVar(value="medium")
-        for option in ("easy", "medium", "hard"):
+        for option in self.DIFFICULTY_OPTIONS:
             tk.Radiobutton(
                 dialog,
                 text=option.title(),
@@ -282,12 +290,38 @@ class JungleApp(tk.Tk):
                 activeforeground="#ffffff",
                 font=("Segoe UI", 11),
             ).pack(anchor="w", padx=16)
+        tk.Label(
+            dialog,
+            text="Who starts",
+            bg=PALETTE.panel_bg,
+            fg="#f7efd9",
+            font=("Georgia", 14, "bold"),
+        ).pack(padx=16, pady=(16, 6))
+        starter = tk.StringVar(value="player")
+        for option, label in self.STARTER_OPTIONS:
+            tk.Radiobutton(
+                dialog,
+                text=label,
+                value=option,
+                variable=starter,
+                bg=PALETTE.panel_bg,
+                fg="#f7efd9",
+                selectcolor="#294f39",
+                activebackground=PALETTE.panel_bg,
+                activeforeground="#ffffff",
+                font=("Segoe UI", 11),
+            ).pack(anchor="w", padx=16)
 
-        def confirm() -> None:
-            self.on_new_game(value.get())
-            dialog.destroy()
+        ttk.Button(
+            dialog,
+            text="Start",
+            command=lambda: self._confirm_new_game(dialog, value, starter),
+            style="Action.TButton",
+        ).pack(padx=16, pady=16)
 
-        ttk.Button(dialog, text="Start", command=confirm, style="Action.TButton").pack(padx=16, pady=16)
+    def _confirm_new_game(self, dialog: tk.Toplevel, difficulty: tk.StringVar, starter: tk.StringVar) -> None:
+        self.on_new_game(difficulty.get(), starter.get() == "player")
+        dialog.destroy()
 
     def _toolbar_actions(self) -> list[tuple[str, Callable[[], None]]]:
         return [
@@ -324,12 +358,14 @@ class JungleApp(tk.Tk):
         legal_targets: set[int],
         thinking: bool,
         diagnostics_enabled: bool,
+        human_side: Side,
         ai_message: str = "",
     ) -> None:
         self.game = game
         self.selected_index = selected_index
         self.legal_targets = legal_targets
         self.diagnostics_enabled = diagnostics_enabled
+        self.human_side = human_side
         self.ai_var.set(ai_message)
         self.status_var.set(self._status_text(thinking))
         self.info_var.set(self._info_text())
@@ -379,8 +415,10 @@ class JungleApp(tk.Tk):
         return f"{state.side_to_move.value.title()} to move."
 
     def _info_text(self) -> str:
+        computer_side = self.human_side.opponent.value.title()
         return "\n".join(
             [
+                f"You control: {self.human_side.value.title()} | Computer: {computer_side}",
                 "Goal: enter the opponent den or capture every opposing piece.",
                 "Rat swims. Lion and tiger leap rivers unless any rat blocks the path.",
             ]

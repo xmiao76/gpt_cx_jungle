@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import jungle.app.controller as controller_module
-from jungle.app.controller import AppController, HUMAN_SIDE, run_window_fit_probe
+from jungle.app.controller import AppController, DEFAULT_HUMAN_SIDE, run_window_fit_probe
 from jungle.domain import Position, Side
 from jungle.engine import Game
 from jungle.rules import find_legal_move
@@ -13,6 +13,7 @@ def make_controller(game: Game | None = None) -> AppController:
     controller = AppController.__new__(AppController)
     controller.game = game or Game()
     controller.difficulty = "medium"
+    controller.human_side = DEFAULT_HUMAN_SIDE
     controller.selected_index = None
     controller.legal_targets = set()
     controller.diagnostics_enabled = False
@@ -26,23 +27,35 @@ def make_controller(game: Game | None = None) -> AppController:
     return controller
 
 
-def test_maybe_start_ai_turn_uses_human_side_constant() -> None:
+def test_maybe_start_ai_turn_uses_configured_human_side() -> None:
     controller = make_controller()
     started: list[str] = []
     controller.start_ai_turn = lambda: started.append("ai")
 
-    controller.game.state.side_to_move = HUMAN_SIDE
+    controller.game.state.side_to_move = controller.human_side
     AppController.maybe_start_ai_turn(controller)
     assert started == []
 
-    controller.game.state.side_to_move = HUMAN_SIDE.opponent
+    controller.game.state.side_to_move = controller.human_side.opponent
     AppController.maybe_start_ai_turn(controller)
     assert started == ["ai"]
 
     controller.ai_vs_ai_enabled = True
-    controller.game.state.side_to_move = HUMAN_SIDE
+    controller.game.state.side_to_move = controller.human_side
     AppController.maybe_start_ai_turn(controller)
     assert started == ["ai", "ai"]
+
+
+def test_maybe_start_ai_turn_respects_red_human_side() -> None:
+    controller = make_controller()
+    controller.human_side = Side.RED
+    started: list[str] = []
+    controller.start_ai_turn = lambda: started.append("ai")
+
+    controller.game.state.side_to_move = Side.BLUE
+    AppController.maybe_start_ai_turn(controller)
+
+    assert started == ["ai"]
 
 
 def test_handle_square_only_selects_human_side_pieces() -> None:
@@ -57,6 +70,26 @@ def test_handle_square_only_selects_human_side_pieces() -> None:
     AppController.handle_square(controller, Position(6, 6).index)
     assert controller.selected_index == Position(6, 6).index
     assert Position(5, 6).index in controller.legal_targets
+    assert refreshes == ["refresh"]
+
+
+def test_handle_square_allows_red_human_to_select_red_piece() -> None:
+    game = Game()
+    blue_move = find_legal_move(game.state, Position(6, 6).index, Position(5, 6).index)
+    assert blue_move is not None
+    game.apply_move(blue_move)
+    controller = make_controller(game)
+    controller.human_side = Side.RED
+    refreshes: list[str] = []
+    controller.refresh = lambda *args, **kwargs: refreshes.append("refresh")
+
+    AppController.handle_square(controller, Position(6, 6).index)
+    assert controller.selected_index is None
+
+    AppController.handle_square(controller, Position(2, 0).index)
+
+    assert controller.selected_index == Position(2, 0).index
+    assert Position(3, 0).index in controller.legal_targets
     assert refreshes == ["refresh"]
 
 
@@ -76,6 +109,23 @@ def test_undo_rewinds_human_and_ai_turn_pair() -> None:
     assert controller.game.state.to_dict() == initial
 
 
+def test_undo_rewinds_human_and_ai_turn_pair_when_human_is_red() -> None:
+    game = Game()
+    initial = game.state.to_dict()
+    blue_move = find_legal_move(game.state, Position(6, 6).index, Position(5, 6).index)
+    assert blue_move is not None
+    game.apply_move(blue_move)
+    red_move = find_legal_move(game.state, Position(2, 0).index, Position(3, 0).index)
+    assert red_move is not None
+    game.apply_move(red_move)
+
+    controller = make_controller(game)
+    controller.human_side = Side.RED
+    AppController.undo(controller)
+
+    assert controller.game.state.to_dict() == initial
+
+
 def test_new_game_resets_runtime_state_and_rechecks_ai_turn() -> None:
     controller = make_controller()
     calls: list[str] = []
@@ -85,9 +135,10 @@ def test_new_game_resets_runtime_state_and_rechecks_ai_turn() -> None:
     controller.refresh = lambda *args, **kwargs: calls.append("refresh")
     controller.maybe_start_ai_turn = lambda: calls.append("maybe")
 
-    AppController.new_game(controller, "hard")
+    AppController.new_game(controller, "hard", human_starts=False)
 
     assert controller.difficulty == "hard"
+    assert controller.human_side is Side.RED
     assert controller.selected_index is None
     assert controller.legal_targets == set()
     assert controller.ai_vs_ai_enabled is False

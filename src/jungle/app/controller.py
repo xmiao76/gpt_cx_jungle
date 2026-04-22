@@ -17,7 +17,7 @@ DIFFICULTY_LIMITS = {
     "hard": 1800,
 }
 
-HUMAN_SIDE = Side.BLUE
+DEFAULT_HUMAN_SIDE = Side.BLUE
 
 
 class AppController:
@@ -25,6 +25,7 @@ class AppController:
         self.game = Game()
         self.difficulty = difficulty
         self.ai = AlphaBetaAI(DIFFICULTY_LIMITS[difficulty])
+        self.human_side = DEFAULT_HUMAN_SIDE
         self.selected_index: int | None = None
         self.legal_targets: set[int] = set()
         self.diagnostics_enabled = False
@@ -49,9 +50,14 @@ class AppController:
     def run(self) -> None:
         self.app.mainloop()
 
-    def new_game(self, difficulty: str) -> None:
+    @property
+    def ai_side(self) -> Side:
+        return self.human_side.opponent
+
+    def new_game(self, difficulty: str, human_starts: bool = True) -> None:
         self.difficulty = difficulty
         self.ai = AlphaBetaAI(DIFFICULTY_LIMITS[difficulty])
+        self.human_side = Side.BLUE if human_starts else Side.RED
         self.game.new_game()
         self.selected_index = None
         self.legal_targets.clear()
@@ -64,7 +70,7 @@ class AppController:
             return
         piece = self.game.state.board[index]
         if self.selected_index is None:
-            if piece is None or piece.side is not HUMAN_SIDE:
+            if piece is None or piece.side is not self.human_side:
                 return
             self.selected_index = index
             self.legal_targets = {move.destination for move in self.game.list_moves() if move.origin == index}
@@ -80,7 +86,7 @@ class AppController:
         try:
             self.game.apply_coordinates(self.selected_index, index)
         except ValueError:
-            if piece is not None and piece.side is HUMAN_SIDE:
+            if piece is not None and piece.side is self.human_side:
                 self.selected_index = index
                 self.legal_targets = {move.destination for move in self.game.list_moves() if move.origin == index}
             else:
@@ -99,7 +105,7 @@ class AppController:
         if self.game.state.winner is not None:
             self.refresh()
             return
-        if self.game.state.side_to_move is HUMAN_SIDE.opponent or self.ai_vs_ai_enabled:
+        if self.game.state.side_to_move is self.ai_side or self.ai_vs_ai_enabled:
             self.start_ai_turn()
 
     def start_ai_turn(self) -> None:
@@ -135,8 +141,9 @@ class AppController:
     def undo(self) -> None:
         if self.thinking:
             return
+        move_count = len(self.game.state.move_history)
         if self.game.undo():
-            if self.game.state.side_to_move is HUMAN_SIDE.opponent and self.game.undo():
+            if move_count >= 2 and self.game.undo():
                 pass
             self.selected_index = None
             self.legal_targets.clear()
@@ -177,6 +184,7 @@ class AppController:
             self.legal_targets,
             self.thinking,
             self.diagnostics_enabled,
+            self.human_side,
             ai_message or f"Difficulty: {self.difficulty}",
         )
 
@@ -190,7 +198,7 @@ def run_smoke_validation() -> int:
     red_ai = AlphaBetaAI(60)
     turns = 0
     while game.state.winner is None and turns < 200:
-        ai = blue_ai if game.state.side_to_move is HUMAN_SIDE else red_ai
+        ai = blue_ai if game.state.side_to_move is Side.BLUE else red_ai
         result = ai.choose_move(game.state)
         if result.move is None:
             break

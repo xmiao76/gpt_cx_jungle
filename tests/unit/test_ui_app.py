@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from jungle.domain import Position
+from types import SimpleNamespace
+
+from jungle.domain import Position, Side
 from jungle.ui.app import (
     JungleApp,
     board_index_from_canvas_point,
@@ -56,6 +58,28 @@ def test_toolbar_actions_include_flip_board() -> None:
     assert "Flip Board" in labels
 
 
+def test_new_game_dialog_supports_starter_selection() -> None:
+    assert JungleApp.STARTER_OPTIONS == (
+        ("player", "Player starts"),
+        ("ai", "AI starts"),
+    )
+
+
+def test_confirm_new_game_passes_difficulty_and_starter_choice() -> None:
+    app = JungleApp.__new__(JungleApp)
+    calls: list[tuple[str, bool]] = []
+    app.on_new_game = lambda difficulty, human_starts: calls.append((difficulty, human_starts))
+    dialog = SimpleNamespace(destroyed=False)
+    dialog.destroy = lambda: setattr(dialog, "destroyed", True)
+    difficulty = SimpleNamespace(get=lambda: "hard")
+    starter = SimpleNamespace(get=lambda: "ai")
+
+    JungleApp._confirm_new_game(app, dialog, difficulty, starter)
+
+    assert calls == [("hard", False)]
+    assert dialog.destroyed is True
+
+
 def test_toggle_board_orientation_updates_state_and_rerenders() -> None:
     app = JungleApp.__new__(JungleApp)
     app.is_board_flipped = False
@@ -66,6 +90,15 @@ def test_toggle_board_orientation_updates_state_and_rerenders() -> None:
 
     assert app.is_board_flipped is True
     assert renders == ["render"]
+
+
+def test_info_text_reports_human_and_computer_sides() -> None:
+    app = JungleApp.__new__(JungleApp)
+    app.human_side = Side.RED
+
+    info = JungleApp._info_text(app)
+
+    assert "You control: Red | Computer: Blue" in info
 
 
 def test_compute_window_metrics_chooses_compact_startup_for_1366x768() -> None:
