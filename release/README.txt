@@ -1,7 +1,7 @@
 Jungle
 
 Launch
-- Double-click Jungle.exe to start the game.
+- Extract the full Jungle.zip archive, then double-click Jungle.exe to start the game.
 
 Gameplay
 - Blue is the human player and moves first.

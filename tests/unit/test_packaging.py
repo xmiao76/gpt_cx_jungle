@@ -19,20 +19,31 @@ def test_build_release_readme_includes_required_model_and_agent_statements() -> 
 def test_write_release_readme_creates_expected_file(tmp_path) -> None:
     readme_path = package_release.write_release_readme(tmp_path)
     assert readme_path == tmp_path / "README.txt"
-    assert "Launch" in readme_path.read_text(encoding="utf-8")
+    content = readme_path.read_text(encoding="utf-8")
+    assert "Launch" in content
+    assert "Extract the full Jungle.zip archive" in content
 
 
-def test_create_release_zip_packages_exe_and_readme(tmp_path) -> None:
+def test_create_release_zip_packages_full_runtime_payload(tmp_path) -> None:
     release_dir = tmp_path / "release"
-    release_dir.mkdir()
+    internal_dir = release_dir / "_internal"
+    internal_dir.mkdir(parents=True)
     (release_dir / "Jungle.exe").write_text("binary", encoding="utf-8")
     (release_dir / "README.txt").write_text("notes", encoding="utf-8")
+    (internal_dir / "python312.dll").write_text("dll", encoding="utf-8")
+    (internal_dir / "VCRUNTIME140.dll").write_text("runtime", encoding="utf-8")
+    (release_dir / "release_smoke_result.txt").write_text("winner=blue", encoding="utf-8")
 
     zip_path = package_release.create_release_zip(release_dir)
 
     assert zip_path == release_dir / package_release.RELEASE_ZIP_NAME
     with zipfile.ZipFile(zip_path) as archive:
-        assert sorted(archive.namelist()) == ["Jungle.exe", "README.txt"]
+        assert sorted(archive.namelist()) == [
+            "Jungle.exe",
+            "README.txt",
+            "_internal/VCRUNTIME140.dll",
+            "_internal/python312.dll",
+        ]
 
 
 def test_write_spec_uses_static_local_package_resolution(tmp_path) -> None:
@@ -48,9 +59,12 @@ def test_write_spec_uses_static_local_package_resolution(tmp_path) -> None:
 
 def test_verify_release_artifacts_requires_required_statements(tmp_path, monkeypatch) -> None:
     release_dir = tmp_path / "release"
-    release_dir.mkdir()
+    internal_dir = release_dir / "_internal"
+    internal_dir.mkdir(parents=True)
     (release_dir / "Jungle.exe").write_text("binary", encoding="utf-8")
     (release_dir / "README.txt").write_text("missing statements", encoding="utf-8")
+    (internal_dir / "python312.dll").write_text("dll", encoding="utf-8")
+    (internal_dir / "VCRUNTIME140.dll").write_text("runtime", encoding="utf-8")
     package_release.create_release_zip(release_dir)
     monkeypatch.chdir(tmp_path)
     (tmp_path / "prompt.md").write_text("prompt", encoding="utf-8")

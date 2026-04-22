@@ -64,7 +64,7 @@ def build_release_readme(model_name: str = MODEL_NAME, agent_name: str = AGENT_N
     return f"""Jungle
 
 Launch
-- Double-click Jungle.exe to start the game.
+- Extract the full Jungle.zip archive, then double-click Jungle.exe to start the game.
 
 Gameplay
 - Blue is the human player and moves first.
@@ -125,11 +125,12 @@ def write_release_readme(release_dir: Path = RELEASE) -> Path:
 def create_release_zip(release_dir: Path = RELEASE) -> Path:
     zip_path = release_dir / RELEASE_ZIP_NAME
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for name in ("Jungle.exe", "README.txt"):
-            file_path = release_dir / name
-            if not file_path.exists():
-                raise RuntimeError(f"Missing release file for zip packaging: {file_path}")
-            archive.write(file_path, arcname=name)
+        for file_path in sorted(release_dir.rglob("*")):
+            if not file_path.is_file():
+                continue
+            if file_path == zip_path or file_path.name == "release_smoke_result.txt":
+                continue
+            archive.write(file_path, arcname=file_path.relative_to(release_dir))
     return zip_path
 
 
@@ -146,7 +147,7 @@ def verify_release_artifacts(release_dir: Path = RELEASE) -> None:
         raise RuntimeError(f"release/{RELEASE_ZIP_NAME} was not created")
     with zipfile.ZipFile(zip_path) as archive:
         names = set(archive.namelist())
-    for required_name in ("Jungle.exe", "README.txt"):
+    for required_name in ("Jungle.exe", "README.txt", "_internal/python312.dll", "_internal/VCRUNTIME140.dll"):
         if required_name not in names:
             raise RuntimeError(f"release/{RELEASE_ZIP_NAME} is missing {required_name}")
     if not (ROOT / "prompt.md").exists():
