@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 from tools.smoke_release import run_packaged_smoke
@@ -13,6 +14,7 @@ DIST = ROOT / "dist"
 BUILD = ROOT / "build"
 RELEASE = ROOT / "release"
 SPEC = ROOT / "Jungle.spec"
+RELEASE_ZIP_NAME = "Jungle.zip"
 MODEL_NAME = "gpt-5.4"
 AGENT_NAME = "Codex"
 REQUIRED_DISCLOSURES = (
@@ -120,6 +122,17 @@ def write_release_readme(release_dir: Path = RELEASE) -> Path:
     return readme_path
 
 
+def create_release_zip(release_dir: Path = RELEASE) -> Path:
+    zip_path = release_dir / RELEASE_ZIP_NAME
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name in ("Jungle.exe", "README.txt"):
+            file_path = release_dir / name
+            if not file_path.exists():
+                raise RuntimeError(f"Missing release file for zip packaging: {file_path}")
+            archive.write(file_path, arcname=name)
+    return zip_path
+
+
 def verify_release_artifacts(release_dir: Path = RELEASE) -> None:
     readme_path = release_dir / "README.txt"
     readme = readme_path.read_text(encoding="utf-8")
@@ -128,6 +141,14 @@ def verify_release_artifacts(release_dir: Path = RELEASE) -> None:
             raise RuntimeError(f"Missing release README requirement: {required}")
     if not (release_dir / "Jungle.exe").exists():
         raise RuntimeError("release/Jungle.exe was not created")
+    zip_path = release_dir / RELEASE_ZIP_NAME
+    if not zip_path.exists():
+        raise RuntimeError(f"release/{RELEASE_ZIP_NAME} was not created")
+    with zipfile.ZipFile(zip_path) as archive:
+        names = set(archive.namelist())
+    for required_name in ("Jungle.exe", "README.txt"):
+        if required_name not in names:
+            raise RuntimeError(f"release/{RELEASE_ZIP_NAME} is missing {required_name}")
     if not (ROOT / "prompt.md").exists():
         raise RuntimeError("prompt.md must remain in the repository root")
 
@@ -139,6 +160,7 @@ def main() -> None:
     assemble_release(built)
     write_release_readme()
     result_file = run_packaged_smoke(RELEASE)
+    create_release_zip()
     verify_release_artifacts()
     print(result_file.read_text(encoding="utf-8"))
     print(f"Release created at {RELEASE}")

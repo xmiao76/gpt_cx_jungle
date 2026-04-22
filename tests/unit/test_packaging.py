@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import zipfile
+
 import pytest
 
 from conftest import load_tool_module
@@ -20,6 +22,19 @@ def test_write_release_readme_creates_expected_file(tmp_path) -> None:
     assert "Launch" in readme_path.read_text(encoding="utf-8")
 
 
+def test_create_release_zip_packages_exe_and_readme(tmp_path) -> None:
+    release_dir = tmp_path / "release"
+    release_dir.mkdir()
+    (release_dir / "Jungle.exe").write_text("binary", encoding="utf-8")
+    (release_dir / "README.txt").write_text("notes", encoding="utf-8")
+
+    zip_path = package_release.create_release_zip(release_dir)
+
+    assert zip_path == release_dir / package_release.RELEASE_ZIP_NAME
+    with zipfile.ZipFile(zip_path) as archive:
+        assert sorted(archive.namelist()) == ["Jungle.exe", "README.txt"]
+
+
 def test_write_spec_uses_static_local_package_resolution(tmp_path) -> None:
     spec_path = tmp_path / "Jungle.spec"
 
@@ -36,6 +51,7 @@ def test_verify_release_artifacts_requires_required_statements(tmp_path, monkeyp
     release_dir.mkdir()
     (release_dir / "Jungle.exe").write_text("binary", encoding="utf-8")
     (release_dir / "README.txt").write_text("missing statements", encoding="utf-8")
+    package_release.create_release_zip(release_dir)
     monkeypatch.chdir(tmp_path)
     (tmp_path / "prompt.md").write_text("prompt", encoding="utf-8")
 
@@ -75,8 +91,9 @@ def test_package_release_main_runs_packaged_smoke_before_verification(monkeypatc
     monkeypatch.setattr(package_release, "assemble_release", lambda bundle: order.append(f"assemble:{bundle.name}"))
     monkeypatch.setattr(package_release, "write_release_readme", lambda: order.append("readme") or (tmp_path / "README.txt"))
     monkeypatch.setattr(package_release, "run_packaged_smoke", lambda release: order.append("smoke") or result_file)
+    monkeypatch.setattr(package_release, "create_release_zip", lambda: order.append("zip") or (tmp_path / "Jungle.zip"))
     monkeypatch.setattr(package_release, "verify_release_artifacts", lambda: order.append("verify"))
 
     package_release.main()
 
-    assert order == ["clean", "assets", "build", "assemble:bundle", "readme", "smoke", "verify"]
+    assert order == ["clean", "assets", "build", "assemble:bundle", "readme", "smoke", "zip", "verify"]
