@@ -116,7 +116,7 @@ def test_rat_can_capture_elephant_only_from_land() -> None:
     assert not can_capture(water_state, water_rat, adjacent_elephant)
 
 
-def test_elephant_can_capture_rat_on_land() -> None:
+def test_elephant_cannot_capture_rat() -> None:
     elephant = Position(2, 0).index
     rat = Position(2, 1).index
     state = make_state(
@@ -125,7 +125,37 @@ def test_elephant_can_capture_rat_on_land() -> None:
             rat: Piece(Side.RED, PieceType.RAT),
         }
     )
-    assert can_capture(state, elephant, rat)
+    assert not can_capture(state, elephant, rat)
+
+
+def test_legal_moves_include_rat_capturing_elephant() -> None:
+    rat = Position(2, 0).index
+    elephant = Position(2, 1).index
+    state = make_state(
+        {
+            rat: Piece(Side.BLUE, PieceType.RAT),
+            elephant: Piece(Side.RED, PieceType.ELEPHANT),
+        }
+    )
+
+    moves = legal_moves(state)
+
+    assert any(move.origin == rat and move.destination == elephant and move.captured is not None for move in moves)
+
+
+def test_legal_moves_exclude_elephant_capturing_rat() -> None:
+    elephant = Position(2, 0).index
+    rat = Position(2, 1).index
+    state = make_state(
+        {
+            elephant: Piece(Side.BLUE, PieceType.ELEPHANT),
+            rat: Piece(Side.RED, PieceType.RAT),
+        }
+    )
+
+    moves = legal_moves(state)
+
+    assert not any(move.origin == elephant and move.destination == rat for move in moves)
 
 
 def test_lion_jump_is_blocked_by_rat_in_river() -> None:

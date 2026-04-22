@@ -20,6 +20,17 @@ def test_write_release_readme_creates_expected_file(tmp_path) -> None:
     assert "Launch" in readme_path.read_text(encoding="utf-8")
 
 
+def test_write_spec_uses_static_local_package_resolution(tmp_path) -> None:
+    spec_path = tmp_path / "Jungle.spec"
+
+    package_release.write_spec(spec_path)
+
+    content = spec_path.read_text(encoding="utf-8")
+    assert "collect_submodules" not in content
+    assert "hiddenimports=[]" in content
+    assert "pathex=['src']" in content
+
+
 def test_verify_release_artifacts_requires_required_statements(tmp_path, monkeypatch) -> None:
     release_dir = tmp_path / "release"
     release_dir.mkdir()

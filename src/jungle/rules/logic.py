@@ -50,7 +50,7 @@ def can_capture(state: GameState, attacker_index: int, defender_index: int) -> b
         return not attacker_in_water and not defender_in_water
 
     if attacker.kind is PieceType.ELEPHANT and defender.kind is PieceType.RAT:
-        return not attacker_in_water and not defender_in_water
+        return False
 
     if attacker_in_water or defender_in_water:
         if not attacker_in_water or not defender_in_water:

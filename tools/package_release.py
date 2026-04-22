@@ -19,6 +19,43 @@ REQUIRED_DISCLOSURES = (
     f"Model used: {MODEL_NAME}",
     f"Code agent used: {AGENT_NAME}",
 )
+SPEC_TEMPLATE = """
+a = Analysis(
+    ['src/jungle/__main__.py'],
+    pathex=['src'],
+    binaries=[],
+    datas=[('src/jungle/ui/assets', 'jungle/ui/assets')],
+    hiddenimports=[],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+pyz = PYZ(a.pure)
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='Jungle',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name='Jungle',
+)
+""".strip()
 
 
 def build_release_readme(model_name: str = MODEL_NAME, agent_name: str = AGENT_NAME) -> str:
@@ -54,50 +91,7 @@ Important Notes
 
 
 def write_spec(spec_path: Path = SPEC) -> None:
-    spec_path.write_text(
-        """
-from PyInstaller.utils.hooks import collect_submodules
-
-hiddenimports = collect_submodules('jungle')
-
-a = Analysis(
-    ['src/jungle/__main__.py'],
-    pathex=['src'],
-    binaries=[],
-    datas=[('src/jungle/ui/assets', 'jungle/ui/assets')],
-    hiddenimports=hiddenimports,
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    noarchive=False,
-    optimize=0,
-)
-pyz = PYZ(a.pure)
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='Jungle',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    console=False,
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name='Jungle',
-)
-""".strip(),
-        encoding="utf-8",
-    )
+    spec_path.write_text(SPEC_TEMPLATE, encoding="utf-8")
 
 
 def clean(paths: tuple[Path, ...] = (DIST, BUILD, RELEASE)) -> None:
