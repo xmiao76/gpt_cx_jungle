@@ -36,6 +36,7 @@ class AppController:
             game=self.game,
             on_square=self.handle_square,
             on_new_game=self.new_game,
+            on_ai_starts=self.start_new_game_with_ai,
             on_undo=self.undo,
             on_redo=self.redo,
             on_save=self.save,
@@ -64,6 +65,9 @@ class AppController:
         self.ai_vs_ai_enabled = False
         self.refresh()
         self.maybe_start_ai_turn()
+
+    def start_new_game_with_ai(self) -> None:
+        self.new_game(self.difficulty, human_starts=False)
 
     def handle_square(self, index: int) -> None:
         if self.thinking or self.game.state.winner is not None:

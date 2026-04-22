@@ -46,6 +46,7 @@ def test_canvas_mapping_round_trips_for_compact_metrics() -> None:
 
 def test_toolbar_actions_include_flip_board() -> None:
     app = JungleApp.__new__(JungleApp)
+    app.on_ai_starts = lambda: None
     app.on_undo = lambda: None
     app.on_redo = lambda: None
     app.on_toggle_diagnostics = lambda: None
@@ -56,6 +57,26 @@ def test_toolbar_actions_include_flip_board() -> None:
     app.toggle_board_orientation = lambda: None
     labels = [label for label, _ in JungleApp._toolbar_actions(app)]
     assert "Flip Board" in labels
+    assert "AI Starts" in labels
+
+
+def test_toolbar_ai_starts_action_uses_direct_callback() -> None:
+    app = JungleApp.__new__(JungleApp)
+    calls: list[str] = []
+    app.on_ai_starts = lambda: calls.append("ai-starts")
+    app.on_undo = lambda: None
+    app.on_redo = lambda: None
+    app.on_toggle_diagnostics = lambda: None
+    app.on_ai_vs_ai = lambda: None
+    app._ask_new_game = lambda: None
+    app._save_game = lambda: None
+    app._load_game = lambda: None
+    app.toggle_board_orientation = lambda: None
+
+    actions = dict(JungleApp._toolbar_actions(app))
+    actions["AI Starts"]()
+
+    assert calls == ["ai-starts"]
 
 
 def test_new_game_dialog_supports_starter_selection() -> None:

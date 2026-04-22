@@ -145,6 +145,17 @@ def test_new_game_resets_runtime_state_and_rechecks_ai_turn() -> None:
     assert calls == ["refresh", "maybe"]
 
 
+def test_start_new_game_with_ai_uses_current_difficulty_and_ai_first() -> None:
+    controller = make_controller()
+    calls: list[tuple[str, bool]] = []
+    controller.difficulty = "hard"
+    controller.new_game = lambda difficulty, human_starts=True: calls.append((difficulty, human_starts))
+
+    AppController.start_new_game_with_ai(controller)
+
+    assert calls == [("hard", False)]
+
+
 def test_load_resets_selection_and_rechecks_ai_turn(monkeypatch) -> None:
     controller = make_controller()
     loaded = Game()

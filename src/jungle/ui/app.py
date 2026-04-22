@@ -70,6 +70,7 @@ class JungleApp(tk.Tk):
         game: Game,
         on_square: Callable[[int], None],
         on_new_game: Callable[[str, bool], None],
+        on_ai_starts: Callable[[], None],
         on_undo: Callable[[], None],
         on_redo: Callable[[], None],
         on_save: Callable[[str], None],
@@ -86,6 +87,7 @@ class JungleApp(tk.Tk):
         self.game = game
         self.on_square = on_square
         self.on_new_game = on_new_game
+        self.on_ai_starts = on_ai_starts
         self.on_undo = on_undo
         self.on_redo = on_redo
         self.on_save = on_save
@@ -326,6 +328,7 @@ class JungleApp(tk.Tk):
     def _toolbar_actions(self) -> list[tuple[str, Callable[[], None]]]:
         return [
             ("New Game", self._ask_new_game),
+            ("AI Starts", self.on_ai_starts),
             ("Undo", self.on_undo),
             ("Redo", self.on_redo),
             ("Save", self._save_game),
