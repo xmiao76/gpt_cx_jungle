@@ -14,5 +14,5 @@ def test_prompt_artifacts_exist() -> None:
 
 def test_release_readme_template_contains_required_disclosure() -> None:
     content = build_release_readme()
-    assert "Model used: gpt-5.4" in content
+    assert "Model used: gpt-5.5" in content
     assert "Code agent used: Codex" in content

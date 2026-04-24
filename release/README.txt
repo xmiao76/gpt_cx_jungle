@@ -14,15 +14,18 @@ Controls
 - Click a blue piece to select it.
 - Click a highlighted square to move.
 - New Game starts a fresh match and lets you choose AI difficulty.
+- AI Starts starts a new match where the computer moves first.
 - Undo rewinds the last human/computer turn pair when available.
 - Redo reapplies the undone move if available.
 - Save and Load store or restore the current game state as JSON.
+- Flip Board changes only the visual orientation. It does not change sides, turns, or game state.
 - Diagnostics shows legal moves and effective ranks for the selected piece.
 - AI vs AI toggles automatic play for both sides.
 
 Important Notes
 - This build follows the documented ruleset in docs/ruleset.md.
 - The packaged build also supports Jungle.exe --smoke-test for release validation.
+- The source prompt is preserved as prompt.md in the repository root.
 - Windows Defender may pause first launch briefly while it scans the executable.
-- Model used: gpt-5.4
+- Model used: gpt-5.5
 - Code agent used: Codex

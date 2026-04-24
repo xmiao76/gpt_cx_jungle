@@ -33,3 +33,60 @@ def test_ai_prefers_den_entry_when_available() -> None:
     result = ai.choose_move(state)
     assert result.move is not None
     assert result.move.destination == Position(0, 3).index
+
+
+def test_ai_blocks_immediate_den_entry_threat() -> None:
+    red_cat_in_blue_trap = Position(7, 3).index
+    blue_dog = Position(7, 2).index
+    state = make_state(
+        {
+            red_cat_in_blue_trap: Piece(Side.RED, PieceType.CAT),
+            blue_dog: Piece(Side.BLUE, PieceType.DOG),
+            Position(0, 0).index: Piece(Side.RED, PieceType.LION),
+        }
+    )
+
+    ai = AlphaBetaAI(300)
+    result = ai.choose_move(state)
+
+    assert result.move is not None
+    assert result.move.origin == blue_dog
+    assert result.move.destination == red_cat_in_blue_trap
+
+
+def test_ai_uses_trap_to_capture_stronger_piece() -> None:
+    red_elephant_in_blue_trap = Position(7, 3).index
+    blue_rat = Position(7, 2).index
+    state = make_state(
+        {
+            red_elephant_in_blue_trap: Piece(Side.RED, PieceType.ELEPHANT),
+            blue_rat: Piece(Side.BLUE, PieceType.RAT),
+            Position(0, 0).index: Piece(Side.RED, PieceType.LION),
+        }
+    )
+
+    ai = AlphaBetaAI(300)
+    result = ai.choose_move(state)
+
+    assert result.move is not None
+    assert result.move.origin == blue_rat
+    assert result.move.destination == red_elephant_in_blue_trap
+
+
+def test_ai_rat_captures_elephant_but_elephant_does_not_chase_rat() -> None:
+    blue_rat = Position(2, 0).index
+    red_elephant = Position(2, 1).index
+    state = make_state(
+        {
+            blue_rat: Piece(Side.BLUE, PieceType.RAT),
+            red_elephant: Piece(Side.RED, PieceType.ELEPHANT),
+            Position(8, 6).index: Piece(Side.RED, PieceType.LION),
+        }
+    )
+
+    ai = AlphaBetaAI(300)
+    result = ai.choose_move(state)
+
+    assert result.move is not None
+    assert result.move.origin == blue_rat
+    assert result.move.destination == red_elephant

@@ -12,7 +12,7 @@ smoke_release = load_tool_module("smoke_release")
 
 def test_build_release_readme_includes_required_model_and_agent_statements() -> None:
     content = package_release.build_release_readme()
-    assert "Model used: gpt-5.4" in content
+    assert "Model used: gpt-5.5" in content
     assert "Code agent used: Codex" in content
 
 
@@ -84,7 +84,7 @@ def test_run_packaged_smoke_executes_release_exe_and_reads_result(tmp_path, monk
     def fake_run(command: list[str], cwd: Path, check: bool) -> None:
         assert check is True
         calls.append((command, cwd))
-        result.write_text("winner=blue", encoding="utf-8")
+        result.write_text("winner=blue\nresult=den_entry\nturns=42", encoding="utf-8")
 
     monkeypatch.setattr(smoke_release.subprocess, "run", fake_run)
 
@@ -92,6 +92,38 @@ def test_run_packaged_smoke_executes_release_exe_and_reads_result(tmp_path, monk
 
     assert result_path == result
     assert calls == [([str(exe), "--smoke-test"], release_dir)]
+
+
+def test_run_packaged_smoke_rejects_zero_turn_result(tmp_path, monkeypatch) -> None:
+    release_dir = tmp_path / "release"
+    release_dir.mkdir()
+    exe = release_dir / "Jungle.exe"
+    exe.write_text("binary", encoding="utf-8")
+    result = release_dir / "release_smoke_result.txt"
+
+    def fake_run(command: list[str], cwd: Path, check: bool) -> None:
+        result.write_text("winner=none\nresult=ongoing\nturns=0", encoding="utf-8")
+
+    monkeypatch.setattr(smoke_release.subprocess, "run", fake_run)
+
+    with pytest.raises(SystemExit, match="did not play any turns"):
+        smoke_release.run_packaged_smoke(release_dir)
+
+
+def test_run_packaged_smoke_rejects_unknown_result_type(tmp_path, monkeypatch) -> None:
+    release_dir = tmp_path / "release"
+    release_dir.mkdir()
+    exe = release_dir / "Jungle.exe"
+    exe.write_text("binary", encoding="utf-8")
+    result = release_dir / "release_smoke_result.txt"
+
+    def fake_run(command: list[str], cwd: Path, check: bool) -> None:
+        result.write_text("winner=blue\nresult=surprise\nturns=3", encoding="utf-8")
+
+    monkeypatch.setattr(smoke_release.subprocess, "run", fake_run)
+
+    with pytest.raises(SystemExit, match="invalid result"):
+        smoke_release.run_packaged_smoke(release_dir)
 
 
 def test_package_release_main_runs_packaged_smoke_before_verification(monkeypatch, tmp_path) -> None:

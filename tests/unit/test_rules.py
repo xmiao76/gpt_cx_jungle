@@ -128,6 +128,18 @@ def test_elephant_cannot_capture_rat() -> None:
     assert not can_capture(state, elephant, rat)
 
 
+def test_land_piece_cannot_capture_rat_in_water() -> None:
+    elephant = Position(2, 1).index
+    water_rat = Position(3, 1).index
+    state = make_state(
+        {
+            elephant: Piece(Side.BLUE, PieceType.ELEPHANT),
+            water_rat: Piece(Side.RED, PieceType.RAT),
+        }
+    )
+    assert not can_capture(state, elephant, water_rat)
+
+
 def test_legal_moves_include_rat_capturing_elephant() -> None:
     rat = Position(2, 0).index
     elephant = Position(2, 1).index
@@ -156,6 +168,13 @@ def test_legal_moves_exclude_elephant_capturing_rat() -> None:
     moves = legal_moves(state)
 
     assert not any(move.origin == elephant and move.destination == rat for move in moves)
+
+
+def test_dog_cannot_enter_water() -> None:
+    dog = Position(2, 1).index
+    state = make_state({dog: Piece(Side.BLUE, PieceType.DOG)})
+    moves = {move.destination for move in generate_piece_moves(state, dog)}
+    assert Position(3, 1).index not in moves
 
 
 def test_lion_jump_is_blocked_by_rat_in_river() -> None:
@@ -188,10 +207,24 @@ def test_tiger_horizontal_jump_works() -> None:
     assert landing in moves
 
 
+def test_leopard_cannot_jump_river() -> None:
+    leopard = Position(3, 0).index
+    landing = Position(3, 3).index
+    state = make_state({leopard: Piece(Side.BLUE, PieceType.LEOPARD)})
+    moves = {move.destination for move in generate_piece_moves(state, leopard)}
+    assert landing not in moves
+
+
 def test_trap_reduces_rank_to_zero() -> None:
     trapped = Position(0, 2).index
     state = make_state({trapped: Piece(Side.BLUE, PieceType.ELEPHANT)})
     assert effective_rank(state, trapped) == 0
+
+
+def test_own_trap_does_not_reduce_rank() -> None:
+    own_trap = Position(8, 2).index
+    state = make_state({own_trap: Piece(Side.BLUE, PieceType.ELEPHANT)})
+    assert effective_rank(state, own_trap) == PieceType.ELEPHANT.rank
 
 
 def test_piece_cannot_enter_own_den() -> None:

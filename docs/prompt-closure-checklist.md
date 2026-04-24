@@ -7,6 +7,7 @@
 - Blue remains the human-controlled side in standard play.
 - Automated tests cover orientation mapping, controller invariants, and release validation.
 - `tools/package_release.py` runs packaged `release/Jungle.exe --smoke-test` before reporting success.
+- `docs/release-validation.md` is used for packaged-exe manual gameplay validation.
 - The release folder contains `Jungle.exe`, bundled runtime files, and a README with:
-  - `Model used: gpt-5.4`
+  - `Model used: gpt-5.5`
   - `Code agent used: Codex`
