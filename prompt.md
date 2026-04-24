@@ -21,6 +21,17 @@ Requirements:
 - Bugs found in testing or gameplay must be fixed and regression-tested until stable.
 - The final application must complete full Jungle games correctly.
 - AI-vs-AI mode is desirable if practical.
+- Support choosing who moves first before a game starts, including human first or AI first.
+
+Rule clarification for river jumping:
+- Implement the lion and tiger river-jump behavior using this explicit interpretation.
+- The lion is stronger than the tiger for river jumping.
+- The lion can jump across the river both horizontally and vertically.
+- Horizontal lion jump means jumping across 3 river squares to the next non-water square on the opposite side.
+- Vertical lion jump means jumping across 2 river squares to the next non-water square on the opposite side.
+- The tiger can jump only vertically across 2 river squares to the next non-water square on the opposite side.
+- Do not assume tiger has the same horizontal jump ability as lion unless the implementation explicitly supports it as an optional documented variant.
+- Any rat-blocking behavior must still be handled correctly according to the selected ruleset.
 
 UI requirements:
 - The final UI must be polished and attractive, not just functional.
@@ -28,6 +39,7 @@ UI requirements:
 - Each piece should look like its animal, not just a letter or plain marker.
 - Include good usability details such as piece selection highlights, legal move indicators, capture feedback, turn display, and win/loss messaging.
 - Support flipping the board upside down as a view option. This feature must only rotate/flip the visual board orientation for display. It must not change the game state, must not swap sides internally, and must not change whose turn it is.
+- Support a clear UI option to choose whether the human player or the AI moves first. This setting must affect only game start order and must work correctly together with the board-flip display option.
 - Avoid placeholder-style visuals in the final release except optionally in debug mode.
 
 Release requirements:
