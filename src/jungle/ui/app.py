@@ -423,7 +423,7 @@ class JungleApp(tk.Tk):
             [
                 f"You control: {self.human_side.value.title()} | Computer: {computer_side}",
                 "Goal: enter the opponent den or capture every opposing piece.",
-                "Rat swims. Lion and tiger leap rivers unless any rat blocks the path.",
+                "Rat swims. Lion leaps both river spans; tiger leaps only the 2-square span.",
             ]
         )
 

@@ -21,6 +21,7 @@ from jungle.domain import (
 
 
 JUMPERS = {PieceType.LION, PieceType.TIGER}
+TIGER_JUMP_WATER_SPAN = 2
 
 
 def effective_rank(state: GameState, index: int, piece: Piece | None = None) -> int:
@@ -116,6 +117,8 @@ def generate_jump_moves(state: GameState, origin: int, piece: Piece) -> list[Mov
             continue
         path = river_path(origin, landing)
         if not path:
+            continue
+        if piece.kind is PieceType.TIGER and len(path) != TIGER_JUMP_WATER_SPAN:
             continue
         if any(state.board[idx] is not None and state.board[idx].kind is PieceType.RAT for idx in path):
             continue

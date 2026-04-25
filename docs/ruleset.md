@@ -15,7 +15,8 @@ This project follows the standard rules described on the Wikipedia Jungle / Dou 
 ## Terrain
 
 - Water squares may only be occupied by rats.
-- Lions and tigers may jump across a river to the next land square in the same row or column.
+- Lions may jump across a river to the next land square on the opposite edge across either 2 or 3 river squares.
+- Tigers may jump only across the 2-river-square span to the next land square on the opposite edge.
 - A lion or tiger jump is illegal if any river square on that jump path contains a rat of either side.
 - Traps reduce the effective rank of an enemy piece inside that trap to 0.
 
@@ -37,5 +38,6 @@ The Wikipedia page notes several published variations. This project uses the fol
 - Universal traps.
 - Leopard river jumping.
 - Lion horizontal jump disabled.
+- Tiger jumping across the 3-river-square span.
 - Dog water movement.
 - Alternate rank ordering between lion and tiger.

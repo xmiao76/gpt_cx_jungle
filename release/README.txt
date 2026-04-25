@@ -7,7 +7,8 @@ Gameplay
 - Blue is the human player and moves first.
 - Win by entering the red den or by capturing every red piece.
 - Rats may enter rivers.
-- Lions and tigers may jump across rivers if no rat blocks the jump path.
+- Lions may jump both river spans; tigers may jump only the 2-square span.
+- Any rat on a river path blocks that jump.
 - Enemy traps reduce the trapped piece to rank 0 while it remains in the trap.
 
 Controls

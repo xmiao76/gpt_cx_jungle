@@ -199,12 +199,28 @@ def test_lion_vertical_jump_works_without_blocker() -> None:
     assert landing in moves
 
 
-def test_tiger_horizontal_jump_works() -> None:
+def test_lion_horizontal_jump_works_without_blocker() -> None:
+    lion = Position(3, 0).index
+    landing = Position(3, 3).index
+    state = make_state({lion: Piece(Side.BLUE, PieceType.LION)})
+    moves = {move.destination for move in generate_piece_moves(state, lion)}
+    assert landing in moves
+
+
+def test_tiger_vertical_jump_works() -> None:
     tiger = Position(3, 0).index
     landing = Position(3, 3).index
     state = make_state({tiger: Piece(Side.BLUE, PieceType.TIGER)})
     moves = {move.destination for move in generate_piece_moves(state, tiger)}
     assert landing in moves
+
+
+def test_tiger_horizontal_jump_is_not_allowed() -> None:
+    tiger = Position(2, 1).index
+    landing = Position(6, 1).index
+    state = make_state({tiger: Piece(Side.BLUE, PieceType.TIGER)})
+    moves = {move.destination for move in generate_piece_moves(state, tiger)}
+    assert landing not in moves
 
 
 def test_leopard_cannot_jump_river() -> None:
