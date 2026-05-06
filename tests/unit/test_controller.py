@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import queue
 from types import SimpleNamespace
 
 import jungle.app.controller as controller_module
@@ -19,8 +20,10 @@ def make_controller(game: Game | None = None) -> AppController:
     controller.diagnostics_enabled = False
     controller.thinking = False
     controller.ai_vs_ai_enabled = False
-    controller.ai_queue = None
-    controller.app = SimpleNamespace(notify_error=lambda *_: None)
+    controller.ai_job_token = 0
+    controller.active_ai_job = None
+    controller.ai_queue = queue.Queue()
+    controller.app = SimpleNamespace(notify_error=lambda *_: None, after=lambda *_: None)
     controller.refresh = lambda *args, **kwargs: None
     controller.start_ai_turn = lambda: None
     controller.maybe_start_ai_turn = lambda: None
@@ -132,6 +135,8 @@ def test_new_game_resets_runtime_state_and_rechecks_ai_turn() -> None:
     controller.selected_index = 10
     controller.legal_targets = {11}
     controller.ai_vs_ai_enabled = True
+    controller.thinking = True
+    controller.active_ai_job = (1, ("old",))
     controller.refresh = lambda *args, **kwargs: calls.append("refresh")
     controller.maybe_start_ai_turn = lambda: calls.append("maybe")
 
@@ -142,6 +147,8 @@ def test_new_game_resets_runtime_state_and_rechecks_ai_turn() -> None:
     assert controller.selected_index is None
     assert controller.legal_targets == set()
     assert controller.ai_vs_ai_enabled is False
+    assert controller.thinking is False
+    assert controller.active_ai_job is None
     assert calls == ["refresh", "maybe"]
 
 
@@ -163,6 +170,8 @@ def test_load_resets_selection_and_rechecks_ai_turn(monkeypatch) -> None:
     calls: list[str] = []
     controller.selected_index = 5
     controller.legal_targets = {6}
+    controller.thinking = True
+    controller.active_ai_job = (1, ("old",))
     controller.refresh = lambda *args, **kwargs: calls.append("refresh")
     controller.maybe_start_ai_turn = lambda: calls.append("maybe")
     monkeypatch.setattr(Game, "load", classmethod(lambda cls, path: loaded))
@@ -172,7 +181,57 @@ def test_load_resets_selection_and_rechecks_ai_turn(monkeypatch) -> None:
     assert controller.game is loaded
     assert controller.selected_index is None
     assert controller.legal_targets == set()
+    assert controller.thinking is False
+    assert controller.active_ai_job is None
     assert calls == ["refresh", "maybe"]
+
+
+def test_poll_ai_queue_ignores_stale_result_after_new_game() -> None:
+    game = Game()
+    blue_move = find_legal_move(game.state, Position(6, 6).index, Position(5, 6).index)
+    assert blue_move is not None
+    game.apply_move(blue_move)
+    stale_move = find_legal_move(game.state, Position(2, 0).index, Position(3, 0).index)
+    assert stale_move is not None
+
+    controller = make_controller(game)
+    stale_signature = AppController.state_signature(controller, controller.game.state)
+    token = AppController.next_ai_job_token(controller)
+    controller.active_ai_job = (token, stale_signature)
+    controller.thinking = True
+
+    AppController.new_game(controller, "medium", human_starts=True)
+    controller.ai_queue.put((token, stale_signature, stale_move, "old result"))
+
+    AppController.poll_ai_queue(controller)
+
+    assert controller.game.state.move_history == []
+    assert controller.thinking is False
+    assert controller.active_ai_job is None
+
+
+def test_poll_ai_queue_ignores_stale_result_after_load(monkeypatch) -> None:
+    game = Game()
+    blue_move = find_legal_move(game.state, Position(6, 6).index, Position(5, 6).index)
+    assert blue_move is not None
+    game.apply_move(blue_move)
+    stale_move = find_legal_move(game.state, Position(2, 0).index, Position(3, 0).index)
+    assert stale_move is not None
+
+    controller = make_controller(game)
+    stale_signature = AppController.state_signature(controller, controller.game.state)
+    token = AppController.next_ai_job_token(controller)
+    controller.active_ai_job = (token, stale_signature)
+    controller.thinking = True
+    monkeypatch.setattr(Game, "load", classmethod(lambda cls, path: Game()))
+
+    AppController.load(controller, "save.json")
+    controller.ai_queue.put((token, stale_signature, stale_move, "old result"))
+    AppController.poll_ai_queue(controller)
+
+    assert controller.game.state.move_history == []
+    assert controller.thinking is False
+    assert controller.active_ai_job is None
 
 
 def test_run_window_fit_probe_checks_startup_and_resize(monkeypatch, capsys) -> None:

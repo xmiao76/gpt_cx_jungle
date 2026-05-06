@@ -1,3 +1,3 @@
-from jungle.ai.search import AlphaBetaAI, SearchResult
+from jungle.ai.search import AlphaBetaAI, SearchConfig, SearchResult
 
-__all__ = ["AlphaBetaAI", "SearchResult"]
+__all__ = ["AlphaBetaAI", "SearchConfig", "SearchResult"]

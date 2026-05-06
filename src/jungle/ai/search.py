@@ -55,6 +55,33 @@ class SearchResult:
     elapsed_ms: float
 
 
+@dataclass(frozen=True, slots=True)
+class SearchConfig:
+    label: str = "baseline"
+    use_threat_score: bool = False
+    use_quiescence: bool = False
+    use_enhanced_ordering: bool = False
+    quiescence_max_depth: int = 0
+    quiescence_candidate_limit: int = 0
+    threat_weight: int = 0
+
+    @staticmethod
+    def baseline() -> "SearchConfig":
+        return SearchConfig()
+
+    @staticmethod
+    def candidate() -> "SearchConfig":
+        return SearchConfig(
+            label="candidate",
+            use_threat_score=True,
+            use_quiescence=True,
+            use_enhanced_ordering=True,
+            quiescence_max_depth=1,
+            quiescence_candidate_limit=4,
+            threat_weight=1,
+        )
+
+
 @dataclass(slots=True)
 class TTEntry:
     depth: int
@@ -64,8 +91,9 @@ class TTEntry:
 
 
 class AlphaBetaAI:
-    def __init__(self, time_limit_ms: int = 1000) -> None:
+    def __init__(self, time_limit_ms: int = 1000, config: SearchConfig | None = None) -> None:
         self.time_limit_ms = time_limit_ms
+        self.config = SearchConfig.baseline() if config is None else config
         self.profile = SearchProfile.FAST if time_limit_ms <= 350 else SearchProfile.FULL
         self.deadline = 0.0
         self.nodes = 0
@@ -84,6 +112,11 @@ class AlphaBetaAI:
         if tactical is not None:
             elapsed_ms = (time.perf_counter() - start) * 1000
             return SearchResult(tactical, self.evaluate(self.apply(state, tactical), state.side_to_move), 1, self.nodes, elapsed_ms)
+        if self.config.use_enhanced_ordering:
+            tactical = self.find_enhanced_tactical_move(state)
+            if tactical is not None:
+                elapsed_ms = (time.perf_counter() - start) * 1000
+                return SearchResult(tactical, self.evaluate(self.apply(state, tactical), state.side_to_move), 1, self.nodes, elapsed_ms)
 
         for depth in range(1, MAX_DEPTH + 1):
             if time.perf_counter() >= self.deadline:
@@ -119,6 +152,37 @@ class AlphaBetaAI:
         if not candidates:
             return None
         return self.order_moves(state, candidates, preferred_move=None)[0]
+
+    def find_enhanced_tactical_move(self, state: GameState) -> Move | None:
+        opponent = state.side_to_move.opponent
+        target_den = RED_DEN if state.side_to_move is Side.BLUE else BLUE_DEN
+        best_move: Move | None = None
+        best_score = 0
+        for move in legal_moves(state):
+            child = self.apply(state, move)
+            if child.winner is state.side_to_move:
+                return move
+            if self.find_immediate_win(child, opponent) is not None:
+                continue
+
+            score = 0
+            if move.captured is not None:
+                score += PIECE_VALUES[move.captured.kind] * 4 - PIECE_VALUES[move.piece.kind]
+                if self.is_square_attacked(child, move.destination, opponent):
+                    score -= PIECE_VALUES[move.piece.kind] * 3
+            if move.destination in self.enemy_traps_for(state.side_to_move):
+                score += 1_200
+            if move.is_jump:
+                score += 2_600
+            distance = Position.from_index(move.destination).manhattan_distance(Position.from_index(target_den))
+            if distance <= 1:
+                score += 2_400
+            if self.find_immediate_win(child, state.side_to_move) is not None:
+                score += 3_200
+            if score > best_score:
+                best_score = score
+                best_move = move
+        return best_move if best_score >= 1_600 else None
 
     def find_immediate_win(self, state: GameState, side: Side) -> Move | None:
         turn_state = self.with_side_to_move(state, side)
@@ -161,7 +225,13 @@ class AlphaBetaAI:
             if alpha >= beta:
                 return entry.score
 
-        if depth <= 0 or state.result_reason:
+        if state.result_reason:
+            score = self.evaluate(state, state.side_to_move)
+            self.tt[key] = TTEntry(depth, score, EXACT, None)
+            return score
+        if depth <= 0:
+            if self.config.use_quiescence:
+                return self._quiescence(state, alpha, beta, 0)
             score = self.evaluate(state, state.side_to_move)
             self.tt[key] = TTEntry(depth, score, EXACT, None)
             return score
@@ -194,6 +264,45 @@ class AlphaBetaAI:
         self.tt[key] = TTEntry(depth, entry_score, flag, best_move_key)
         return entry_score
 
+    def _quiescence(self, state: GameState, alpha: float, beta: float, extension_depth: int) -> int:
+        if time.perf_counter() >= self.deadline:
+            return self.evaluate(state, state.side_to_move)
+        self.nodes += 1
+
+        stand_pat = self.evaluate(state, state.side_to_move)
+        if stand_pat >= beta:
+            return int(beta)
+        alpha = max(alpha, stand_pat)
+        if extension_depth >= self.config.quiescence_max_depth or state.result_reason:
+            return int(alpha)
+
+        candidates = self.forcing_moves(state)
+        if not candidates:
+            return int(alpha)
+
+        for move in self.order_moves(state, candidates, tactical=True)[: self.config.quiescence_candidate_limit]:
+            if time.perf_counter() >= self.deadline:
+                break
+            score = -self._quiescence(self.apply(state, move), -beta, -alpha, extension_depth + 1)
+            if score >= beta:
+                return int(beta)
+            alpha = max(alpha, score)
+        return int(alpha)
+
+    def forcing_moves(self, state: GameState) -> list[Move]:
+        target_den = RED_DEN if state.side_to_move is Side.BLUE else BLUE_DEN
+        opponent = state.side_to_move.opponent
+        forcing: list[Move] = []
+        for move in legal_moves(state):
+            if move.captured is not None or move.destination == target_den or move.destination in self.enemy_traps_for(state.side_to_move):
+                forcing.append(move)
+                continue
+            child = self.apply(state, move)
+            if child.winner is state.side_to_move or self.find_immediate_win(child, opponent) is None:
+                if self.find_immediate_win(state, opponent) is not None:
+                    forcing.append(move)
+        return forcing
+
     def order_moves(
         self,
         state: GameState,
@@ -225,6 +334,13 @@ class AlphaBetaAI:
                 score -= PIECE_VALUES[move.piece.kind] * 16
             if tactical and self.find_immediate_win(child, opponent) is not None:
                 score -= 80_000
+            if self.config.use_enhanced_ordering:
+                if self.find_immediate_win(child, state.side_to_move) is not None:
+                    score += 18_000
+                if self.is_square_attacked(child, move.destination, opponent) and child.winner is None:
+                    score -= PIECE_VALUES[move.piece.kind] * 8
+                if move.destination in self.own_traps_for(state.side_to_move):
+                    score += 400
             return score
 
         return sorted(moves, key=move_score, reverse=True)
@@ -241,6 +357,9 @@ class AlphaBetaAI:
         score = self.fast_evaluate(state, perspective)
         score += self.mobility_score(state, perspective)
         score -= self.mobility_score(state, perspective.opponent)
+        if self.config.use_threat_score:
+            score += self.config.threat_weight * self.threat_score(state, perspective)
+            score -= self.config.threat_weight * self.threat_score(state, perspective.opponent)
         return score
 
     def fast_evaluate(self, state: GameState, perspective: Side) -> int:
@@ -265,6 +384,8 @@ class AlphaBetaAI:
         local += (18 - distance_to_target) * 18
         if distance_to_target <= 2:
             local += (3 - distance_to_target) * 450
+        elif self.config.use_threat_score and distance_to_target <= 4:
+            local += (5 - distance_to_target) * 140
         if index in self.enemy_traps_for(piece.side):
             local += 380
         if index in self.own_traps_for(piece.side):

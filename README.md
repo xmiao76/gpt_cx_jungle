@@ -32,6 +32,12 @@ Run tests:
 python -m pytest
 ```
 
+Compare baseline and candidate AI strength:
+
+```powershell
+python -m tools.ai_benchmark
+```
+
 Regenerate UI assets:
 
 ```powershell

@@ -5,8 +5,8 @@ import queue
 import threading
 from pathlib import Path
 
-from jungle.ai import AlphaBetaAI
-from jungle.domain import Move, Side
+from jungle.ai import AlphaBetaAI, SearchConfig
+from jungle.domain import GameState, Move, Side
 from jungle.engine import Game
 from jungle.ui import JungleApp
 
@@ -18,19 +18,32 @@ DIFFICULTY_LIMITS = {
 }
 
 DEFAULT_HUMAN_SIDE = Side.BLUE
+DIFFICULTY_CONFIGS = {
+    "easy": SearchConfig.baseline(),
+    "medium": SearchConfig(
+        label="medium",
+        use_threat_score=True,
+        use_quiescence=False,
+        use_enhanced_ordering=True,
+        threat_weight=1,
+    ),
+    "hard": SearchConfig.candidate(),
+}
 
 
 class AppController:
     def __init__(self, difficulty: str = "medium") -> None:
         self.game = Game()
         self.difficulty = difficulty
-        self.ai = AlphaBetaAI(DIFFICULTY_LIMITS[difficulty])
+        self.ai = AlphaBetaAI(DIFFICULTY_LIMITS[difficulty], DIFFICULTY_CONFIGS[difficulty])
         self.human_side = DEFAULT_HUMAN_SIDE
         self.selected_index: int | None = None
         self.legal_targets: set[int] = set()
         self.diagnostics_enabled = False
         self.thinking = False
-        self.ai_queue: queue.Queue[tuple[Move | None, str]] = queue.Queue()
+        self.ai_job_token = 0
+        self.active_ai_job: tuple[int, tuple] | None = None
+        self.ai_queue: queue.Queue[tuple[int, tuple, Move | None, str]] = queue.Queue()
         self.ai_vs_ai_enabled = False
         self.app = JungleApp(
             game=self.game,
@@ -56,8 +69,9 @@ class AppController:
         return self.human_side.opponent
 
     def new_game(self, difficulty: str, human_starts: bool = True) -> None:
+        self.invalidate_pending_ai_result()
         self.difficulty = difficulty
-        self.ai = AlphaBetaAI(DIFFICULTY_LIMITS[difficulty])
+        self.ai = AlphaBetaAI(DIFFICULTY_LIMITS[difficulty], DIFFICULTY_CONFIGS[difficulty])
         self.human_side = Side.BLUE if human_starts else Side.RED
         self.game.new_game()
         self.selected_index = None
@@ -100,6 +114,7 @@ class AppController:
             self.refresh()
             return
 
+        self.invalidate_pending_ai_result()
         self.selected_index = None
         self.legal_targets.clear()
         self.refresh()
@@ -117,13 +132,17 @@ class AppController:
             return
         self.thinking = True
         state = self.game.state.copy()
+        token = self.next_ai_job_token()
+        signature = self.state_signature(state)
+        self.active_ai_job = (token, signature)
         difficulty = self.difficulty
+        config = DIFFICULTY_CONFIGS[difficulty]
 
         def worker() -> None:
-            ai = AlphaBetaAI(DIFFICULTY_LIMITS[difficulty])
+            ai = AlphaBetaAI(DIFFICULTY_LIMITS[difficulty], config)
             result = ai.choose_move(state)
             message = f"Difficulty: {difficulty} | depth {result.depth} | nodes {result.nodes} | {result.elapsed_ms:.0f} ms"
-            self.ai_queue.put((result.move, message))
+            self.ai_queue.put((token, signature, result.move, message))
 
         threading.Thread(target=worker, daemon=True).start()
         self.refresh()
@@ -131,8 +150,15 @@ class AppController:
     def poll_ai_queue(self) -> None:
         try:
             while True:
-                move, message = self.ai_queue.get_nowait()
+                token, signature, move, message = self.ai_queue.get_nowait()
+                if self.active_ai_job != (token, signature) or self.state_signature(self.game.state) != signature:
+                    if self.active_ai_job is None or self.active_ai_job == (token, signature):
+                        self.thinking = False
+                        self.active_ai_job = None
+                    self.refresh()
+                    continue
                 self.thinking = False
+                self.active_ai_job = None
                 if move is not None and self.game.state.winner is None:
                     self.game.apply_move(move)
                 self.refresh(message)
@@ -145,6 +171,7 @@ class AppController:
     def undo(self) -> None:
         if self.thinking:
             return
+        self.invalidate_pending_ai_result()
         move_count = len(self.game.state.move_history)
         if self.game.undo():
             if move_count >= 2 and self.game.undo():
@@ -156,6 +183,7 @@ class AppController:
     def redo(self) -> None:
         if self.thinking:
             return
+        self.invalidate_pending_ai_result()
         if self.game.redo():
             self.refresh()
             self.maybe_start_ai_turn()
@@ -165,6 +193,7 @@ class AppController:
         self.refresh()
 
     def load(self, path: str) -> None:
+        self.invalidate_pending_ai_result()
         self.game = Game.load(path)
         self.selected_index = None
         self.legal_targets.clear()
@@ -191,6 +220,20 @@ class AppController:
             self.human_side,
             ai_message or f"Difficulty: {self.difficulty}",
         )
+
+    def next_ai_job_token(self) -> int:
+        self.ai_job_token = getattr(self, "ai_job_token", 0) + 1
+        return self.ai_job_token
+
+    def invalidate_pending_ai_result(self) -> None:
+        self.ai_job_token = getattr(self, "ai_job_token", 0) + 1
+        self.active_ai_job = None
+        self.thinking = False
+
+    def state_signature(self, state: GameState) -> tuple:
+        board = tuple(None if piece is None else (piece.side.value, piece.kind.name) for piece in state.board)
+        history = tuple((move.origin, move.destination, move.piece.side.value, move.piece.kind.name) for move in state.move_history)
+        return board, state.side_to_move.value, state.result.value, state.winner.value if state.winner else None, history
 
 
 def run_smoke_validation() -> int:

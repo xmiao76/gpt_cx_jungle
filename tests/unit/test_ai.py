@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from jungle.ai import AlphaBetaAI
+from jungle.ai import AlphaBetaAI, SearchConfig
 from jungle.domain import Piece, PieceType, Position, Side
 from jungle.engine import Game
 
@@ -90,3 +90,49 @@ def test_ai_rat_captures_elephant_but_elephant_does_not_chase_rat() -> None:
     assert result.move is not None
     assert result.move.origin == blue_rat
     assert result.move.destination == red_elephant
+
+
+def test_search_config_baseline_preserves_default_constructor() -> None:
+    game = Game()
+    default = AlphaBetaAI(80).choose_move(game.state)
+    baseline = AlphaBetaAI(80, SearchConfig.baseline()).choose_move(game.state)
+
+    assert default.move is not None
+    assert baseline.move is not None
+    assert (default.move.origin, default.move.destination) == (baseline.move.origin, baseline.move.destination)
+
+
+def test_candidate_ai_respects_tiger_jump_limit() -> None:
+    tiger = Position(2, 1).index
+    blocked_span_landing = Position(6, 1).index
+    legal_step = Position(2, 0).index
+    state = make_state(
+        {
+            tiger: Piece(Side.BLUE, PieceType.TIGER),
+            Position(8, 6).index: Piece(Side.RED, PieceType.LION),
+        }
+    )
+
+    ai = AlphaBetaAI(300, SearchConfig.candidate())
+    result = ai.choose_move(state)
+
+    assert result.move is not None
+    assert result.move.destination in {legal_step, Position(2, 2).index, Position(1, 1).index}
+    assert result.move.destination != blocked_span_landing
+
+
+def test_candidate_ai_can_use_lion_three_square_span_jump() -> None:
+    lion = Position(3, 0).index
+    landing = Position(3, 3).index
+    state = make_state(
+        {
+            lion: Piece(Side.BLUE, PieceType.LION),
+            landing: Piece(Side.RED, PieceType.RAT),
+        }
+    )
+
+    ai = AlphaBetaAI(300, SearchConfig.candidate())
+    result = ai.choose_move(state)
+
+    assert result.move is not None
+    assert result.move.destination == landing
