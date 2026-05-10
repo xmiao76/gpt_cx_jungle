@@ -429,12 +429,18 @@ class AlphaBetaAI:
             local += 90
         if TRAP_OWNER.get(index) is piece.side.opponent:
             local -= PIECE_VALUES[piece.kind] // 2
+        if self.config.use_threat_score:
+            local += self.den_lane_score(state, index, piece)
+        if self.config.use_threat_score:
+            local += self.rat_role_score(state, index, piece)
         if piece.kind is PieceType.RAT and index in WATER:
             local += 160
         if piece.kind in {PieceType.LION, PieceType.TIGER}:
             local += self.jump_lane_score(state, index, piece)
         if distance_to_own <= 2:
             local += (3 - distance_to_own) * 80
+        if self.config.use_threat_score and self.is_square_attacked(state, index, piece.side.opponent):
+            local -= PIECE_VALUES[piece.kind] // 3
         return local
 
     def threat_score(self, state: GameState, side: Side) -> int:
@@ -476,11 +482,44 @@ class AlphaBetaAI:
                 score += PIECE_VALUES[move.captured.kind]
         return score
 
+    def den_lane_score(self, state: GameState, index: int, piece: Piece) -> int:
+        target = Position.from_index(RED_DEN if piece.side is Side.BLUE else BLUE_DEN)
+        current = Position.from_index(index)
+        score = 0
+        if current.col == target.col:
+            score += 1
+        if abs(current.col - target.col) == 1 and current.manhattan_distance(target) <= 3:
+            score += 1
+        if index in self.enemy_traps_for(piece.side):
+            score += 1
+        return score
+
+    def rat_role_score(self, state: GameState, index: int, piece: Piece) -> int:
+        if piece.kind is not PieceType.RAT:
+            return 0
+        score = 0
+        if index in WATER:
+            score += 180
+        turn_state = self.with_side_to_move(state, piece.side)
+        for move in legal_moves(turn_state):
+            if move.origin != index:
+                continue
+            if move.captured is not None and move.captured.kind is PieceType.ELEPHANT:
+                score += 900
+        return score
+
     def is_square_attacked(self, state: GameState, index: int, by_side: Side) -> bool:
         if state.winner is not None:
             return False
+        key = (self._hash_state(state), index, by_side)
+        cached = self.attack_cache.get(key)
+        if cached is not None:
+            return cached
         attack_state = self.with_side_to_move(state, by_side)
-        return any(move.destination == index for move in legal_moves(attack_state))
+        attacked_targets = {move.destination for move in legal_moves(attack_state)}
+        for square in range(len(state.board)):
+            self.attack_cache[(key[0], square, by_side)] = square in attacked_targets
+        return self.attack_cache[key]
 
     def enemy_traps_for(self, side: Side) -> set[int]:
         return RED_TRAPS if side is Side.BLUE else BLUE_TRAPS
