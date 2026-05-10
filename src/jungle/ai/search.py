@@ -172,7 +172,10 @@ class AlphaBetaAI:
         target_den = RED_DEN if state.side_to_move is Side.BLUE else BLUE_DEN
         best_move: Move | None = None
         best_score = 0
-        for move in legal_moves(state):
+        moves = legal_moves(state)
+        if not self.use_deep_ordering(moves):
+            return None
+        for move in moves:
             child = self.apply(state, move)
             if child.winner is state.side_to_move:
                 return move
@@ -210,7 +213,7 @@ class AlphaBetaAI:
         best_score = -math.inf
         best_move: Move | None = None
         alpha = -math.inf
-        moves = self.order_moves(state, legal_moves(state), preferred_move=preferred_move, tactical=True)
+        moves = self.order_moves(state, legal_moves(state), preferred_move=preferred_move, tactical=True, ply=0)
         for move in moves:
             score = -self._alphabeta(self.apply(state, move), depth - 1, -math.inf, -alpha, 1)
             if score > best_score:
@@ -257,7 +260,7 @@ class AlphaBetaAI:
         value = -math.inf
         best_move_key: tuple[int, int] | None = None
         preferred = self.move_from_key(moves, entry.best_move if entry is not None else None)
-        for move in self.order_moves(state, moves, preferred_move=preferred):
+        for move in self.order_moves(state, moves, preferred_move=preferred, ply=ply):
             child = self.apply(state, move)
             score = -self._alphabeta(child, depth - 1, -beta, -alpha, ply + 1)
             if score > value:
@@ -265,6 +268,7 @@ class AlphaBetaAI:
                 best_move_key = (move.origin, move.destination)
             alpha = max(alpha, score)
             if alpha >= beta:
+                self.record_cutoff(state, move, depth, ply)
                 break
 
         flag = EXACT
@@ -304,16 +308,21 @@ class AlphaBetaAI:
     def forcing_moves(self, state: GameState) -> list[Move]:
         target_den = RED_DEN if state.side_to_move is Side.BLUE else BLUE_DEN
         opponent = state.side_to_move.opponent
+        opponent_immediate_win = self.find_immediate_win(state, opponent)
         forcing: list[Move] = []
         for move in legal_moves(state):
             if move.captured is not None or move.destination == target_den or move.destination in self.enemy_traps_for(state.side_to_move):
                 forcing.append(move)
                 continue
+            if opponent_immediate_win is None:
+                continue
             child = self.apply(state, move)
             if child.winner is state.side_to_move or self.find_immediate_win(child, opponent) is None:
-                if self.find_immediate_win(state, opponent) is not None:
-                    forcing.append(move)
+                forcing.append(move)
         return forcing
+
+    def use_deep_ordering(self, moves: list[Move]) -> bool:
+        return self.profile is SearchProfile.FULL or len(moves) <= 12
 
     def order_moves(
         self,
@@ -321,17 +330,21 @@ class AlphaBetaAI:
         moves: list[Move],
         preferred_move: Move | None = None,
         tactical: bool = False,
+        ply: int = 0,
     ) -> list[Move]:
         target_den = RED_DEN if state.side_to_move is Side.BLUE else BLUE_DEN
         opponent = state.side_to_move.opponent
+        deep_ordering = self.use_deep_ordering(moves)
 
         def move_score(move: Move) -> int:
             score = 0
             if preferred_move is not None and move.origin == preferred_move.origin and move.destination == preferred_move.destination:
                 score += 1_000_000
-            child = self.apply(state, move)
-            if child.winner is state.side_to_move:
-                score += 900_000
+            move_key = (move.origin, move.destination)
+            if self.config.use_killer_moves and move_key in self.killer_moves.get(ply, []):
+                score += 120_000
+            if self.config.use_history_ordering:
+                score += self.history_scores.get((state.side_to_move, move.origin, move.destination), 0)
             if move.captured is not None:
                 score += 30_000 + PIECE_VALUES[move.captured.kind] * 20 - PIECE_VALUES[move.piece.kind]
             if move.destination == target_den:
@@ -342,17 +355,22 @@ class AlphaBetaAI:
             score += (18 - distance) * 120
             if move.destination in self.enemy_traps_for(state.side_to_move):
                 score += 2_200
-            if tactical and self.is_square_attacked(child, move.destination, opponent) and child.winner is None:
-                score -= PIECE_VALUES[move.piece.kind] * 16
-            if tactical and self.find_immediate_win(child, opponent) is not None:
-                score -= 80_000
-            if self.config.use_enhanced_ordering:
-                if self.find_immediate_win(child, state.side_to_move) is not None:
-                    score += 18_000
-                if self.is_square_attacked(child, move.destination, opponent) and child.winner is None:
-                    score -= PIECE_VALUES[move.piece.kind] * 8
-                if move.destination in self.own_traps_for(state.side_to_move):
-                    score += 400
+            if deep_ordering:
+                child = self.apply(state, move)
+                if child.winner is state.side_to_move:
+                    score += 900_000
+                is_attacked = self.is_square_attacked(child, move.destination, opponent) and child.winner is None
+                if tactical and is_attacked:
+                    score -= PIECE_VALUES[move.piece.kind] * 16
+                if tactical and self.find_immediate_win(child, opponent) is not None:
+                    score -= 80_000
+                if self.config.use_enhanced_ordering:
+                    if self.find_immediate_win(child, state.side_to_move) is not None:
+                        score += 18_000
+                    if is_attacked:
+                        score -= PIECE_VALUES[move.piece.kind] * 8
+                    if move.destination in self.own_traps_for(state.side_to_move):
+                        score += 400
             return score
 
         return sorted(moves, key=move_score, reverse=True)
@@ -482,6 +500,19 @@ class AlphaBetaAI:
             if (move.origin, move.destination) == key:
                 return move
         return None
+
+    def record_cutoff(self, state: GameState, move: Move, depth: int, ply: int) -> None:
+        if move.captured is not None:
+            return
+        move_key = (move.origin, move.destination)
+        if self.config.use_killer_moves:
+            killers = self.killer_moves.setdefault(ply, [])
+            if move_key not in killers:
+                killers.insert(0, move_key)
+                del killers[2:]
+        if self.config.use_history_ordering:
+            history_key = (state.side_to_move, move.origin, move.destination)
+            self.history_scores[history_key] = self.history_scores.get(history_key, 0) + depth * depth
 
     def apply(self, state: GameState, move: Move) -> GameState:
         game = Game(state)
