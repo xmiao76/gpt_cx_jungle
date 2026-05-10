@@ -212,7 +212,7 @@ class AlphaBetaAI:
         alpha = -math.inf
         moves = self.order_moves(state, legal_moves(state), preferred_move=preferred_move, tactical=True)
         for move in moves:
-            score = -self._alphabeta(self.apply(state, move), depth - 1, -math.inf, -alpha)
+            score = -self._alphabeta(self.apply(state, move), depth - 1, -math.inf, -alpha, 1)
             if score > best_score:
                 best_score = score
                 best_move = move
@@ -221,7 +221,7 @@ class AlphaBetaAI:
                 break
         return int(best_score), best_move
 
-    def _alphabeta(self, state: GameState, depth: int, alpha: float, beta: float) -> int:
+    def _alphabeta(self, state: GameState, depth: int, alpha: float, beta: float, ply: int) -> int:
         if time.perf_counter() >= self.deadline:
             return self.evaluate(state, state.side_to_move)
         self.nodes += 1
@@ -240,9 +240,7 @@ class AlphaBetaAI:
                 return entry.score
 
         if state.result_reason:
-            score = self.evaluate(state, state.side_to_move)
-            self.tt[key] = TTEntry(depth, score, EXACT, None)
-            return score
+            return self.terminal_score(state, state.side_to_move, ply)
         if depth <= 0:
             if self.config.use_quiescence:
                 return self._quiescence(state, alpha, beta, 0)
@@ -261,7 +259,7 @@ class AlphaBetaAI:
         preferred = self.move_from_key(moves, entry.best_move if entry is not None else None)
         for move in self.order_moves(state, moves, preferred_move=preferred):
             child = self.apply(state, move)
-            score = -self._alphabeta(child, depth - 1, -beta, -alpha)
+            score = -self._alphabeta(child, depth - 1, -beta, -alpha, ply + 1)
             if score > value:
                 value = score
                 best_move_key = (move.origin, move.destination)
@@ -375,6 +373,13 @@ class AlphaBetaAI:
             score += self.config.threat_weight * self.threat_score(state, perspective)
             score -= self.config.threat_weight * self.threat_score(state, perspective.opponent)
         return score
+
+    def terminal_score(self, state: GameState, perspective: Side, ply: int) -> int:
+        if state.winner is perspective:
+            return TERMINAL_SCORE - ply
+        if state.winner is perspective.opponent:
+            return -TERMINAL_SCORE + ply
+        return self.evaluate(state, perspective)
 
     def fast_evaluate(self, state: GameState, perspective: Side) -> int:
         score = 0
