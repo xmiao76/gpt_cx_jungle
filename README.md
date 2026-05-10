@@ -32,11 +32,22 @@ Run tests:
 python -m pytest
 ```
 
-Compare baseline and candidate AI strength:
+Compare baseline and stronger AI strength:
 
 ```powershell
-python -m tools.ai_benchmark
+python tools\ai_benchmark.py
 ```
+
+## AI strength checks
+
+The default computer player uses the stronger alpha-beta profile in `src/jungle/ai/search.py`.
+The baseline profile remains available for comparison, and strength is validated with:
+
+```powershell
+python tools\ai_benchmark.py
+```
+
+The benchmark must keep the stronger profile at `10/10` fixed tactical positions and at least an even score against the baseline head-to-head sample.
 
 Regenerate UI assets:
 

@@ -6,10 +6,13 @@ import sys
 import zipfile
 from pathlib import Path
 
-from tools.smoke_release import run_packaged_smoke
-
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.smoke_release import run_packaged_smoke
+
 DIST = ROOT / "dist"
 BUILD = ROOT / "build"
 RELEASE = ROOT / "release"
