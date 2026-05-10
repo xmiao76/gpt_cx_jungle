@@ -247,10 +247,19 @@ def print_summary(baseline: ConfigStats, candidate: ConfigStats, head_to_head_sc
 def main() -> None:
     baseline_config = SearchConfig.baseline()
     candidate_config = SearchConfig.candidate()
+    stronger_config = SearchConfig.stronger()
     baseline = evaluate_fixed_positions(baseline_config)
     candidate = evaluate_fixed_positions(candidate_config)
-    head_to_head_score = run_head_to_head(candidate_config, baseline_config)
-    print_summary(baseline, candidate, head_to_head_score)
+    stronger = evaluate_fixed_positions(stronger_config)
+    head_to_head_score = run_head_to_head(stronger_config, baseline_config)
+    print_summary(baseline, stronger, head_to_head_score)
+
+    if stronger.passed < stronger.total:
+        raise SystemExit(f"stronger config failed fixed positions: {stronger.passed}/{stronger.total}")
+    if stronger.passed < candidate.passed:
+        raise SystemExit("stronger config regressed below candidate fixed-position score")
+    if head_to_head_score < 0.50:
+        raise SystemExit(f"stronger head-to-head score too low: {head_to_head_score:.2f}")
 
 
 if __name__ == "__main__":
