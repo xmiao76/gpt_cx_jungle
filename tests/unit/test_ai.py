@@ -92,14 +92,24 @@ def test_ai_rat_captures_elephant_but_elephant_does_not_chase_rat() -> None:
     assert result.move.destination == red_elephant
 
 
-def test_search_config_baseline_preserves_default_constructor() -> None:
+def test_search_config_stronger_is_default_constructor() -> None:
     game = Game()
     default = AlphaBetaAI(80).choose_move(game.state)
-    baseline = AlphaBetaAI(80, SearchConfig.baseline()).choose_move(game.state)
+    stronger = AlphaBetaAI(80, SearchConfig.stronger()).choose_move(game.state)
 
     assert default.move is not None
-    assert baseline.move is not None
-    assert (default.move.origin, default.move.destination) == (baseline.move.origin, baseline.move.destination)
+    assert stronger.move is not None
+    assert (default.move.origin, default.move.destination) == (stronger.move.origin, stronger.move.destination)
+
+
+def test_search_config_legacy_positional_constructor_shape_is_preserved() -> None:
+    config = SearchConfig("medium", True, False, True, 1, 4, 1)
+
+    assert config.quiescence_max_depth == 1
+    assert config.quiescence_candidate_limit == 4
+    assert config.threat_weight == 1
+    assert config.use_killer_moves is False
+    assert config.use_history_ordering is False
 
 
 def test_candidate_ai_respects_tiger_jump_limit() -> None:

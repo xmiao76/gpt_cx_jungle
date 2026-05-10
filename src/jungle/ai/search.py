@@ -64,6 +64,8 @@ class SearchConfig:
     quiescence_max_depth: int = 0
     quiescence_candidate_limit: int = 0
     threat_weight: int = 0
+    use_killer_moves: bool = False
+    use_history_ordering: bool = False
 
     @staticmethod
     def baseline() -> "SearchConfig":
@@ -71,11 +73,17 @@ class SearchConfig:
 
     @staticmethod
     def candidate() -> "SearchConfig":
+        return SearchConfig.stronger(label="candidate")
+
+    @staticmethod
+    def stronger(label: str = "stronger") -> "SearchConfig":
         return SearchConfig(
-            label="candidate",
+            label=label,
             use_threat_score=True,
             use_quiescence=True,
             use_enhanced_ordering=True,
+            use_killer_moves=True,
+            use_history_ordering=True,
             quiescence_max_depth=1,
             quiescence_candidate_limit=4,
             threat_weight=1,
@@ -93,16 +101,22 @@ class TTEntry:
 class AlphaBetaAI:
     def __init__(self, time_limit_ms: int = 1000, config: SearchConfig | None = None) -> None:
         self.time_limit_ms = time_limit_ms
-        self.config = SearchConfig.baseline() if config is None else config
+        self.config = SearchConfig.stronger() if config is None else config
         self.profile = SearchProfile.FAST if time_limit_ms <= 350 else SearchProfile.FULL
         self.deadline = 0.0
         self.nodes = 0
         self.tt: dict[tuple, TTEntry] = {}
+        self.killer_moves: dict[int, list[tuple[int, int]]] = {}
+        self.history_scores: dict[tuple[Side, int, int], int] = {}
+        self.attack_cache: dict[tuple[tuple, int, Side], bool] = {}
 
     def choose_move(self, state: GameState) -> SearchResult:
         self.deadline = time.perf_counter() + self.time_limit_ms / 1000.0
         self.nodes = 0
         self.tt.clear()
+        self.killer_moves.clear()
+        self.history_scores.clear()
+        self.attack_cache.clear()
         best_move: Move | None = None
         best_score = -math.inf
         completed_depth = 0
