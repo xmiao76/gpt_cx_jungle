@@ -18,6 +18,7 @@ from jungle.domain import (
     Position,
     Side,
     TRAP_OWNER,
+    neighbors,
 )
 from jungle.engine import Game
 from jungle.rules import legal_moves
@@ -58,9 +59,23 @@ class SearchResult:
 @dataclass(frozen=True, slots=True)
 class SearchConfig:
     label: str = "baseline"
+    max_depth: int = MAX_DEPTH
     use_threat_score: bool = False
     use_quiescence: bool = False
     use_enhanced_ordering: bool = False
+    use_killer_moves: bool = False
+    use_history_heuristic: bool = False
+    use_static_capture_ordering: bool = False
+    use_den_safety: bool = False
+    force_full_evaluation: bool = False
+    use_aspiration_windows: bool = False
+    use_late_move_reductions: bool = False
+    use_repetition_penalty: bool = False
+    use_den_race_score: bool = False
+    aspiration_window: int = 650
+    lmr_min_depth: int = 3
+    lmr_move_threshold: int = 4
+    repetition_penalty: int = 320
     quiescence_max_depth: int = 0
     quiescence_candidate_limit: int = 0
     threat_weight: int = 0
@@ -71,13 +86,27 @@ class SearchConfig:
 
     @staticmethod
     def candidate() -> "SearchConfig":
+        return SearchConfig.hard()
+
+    @staticmethod
+    def hard() -> "SearchConfig":
         return SearchConfig(
-            label="candidate",
+            label="hard",
+            max_depth=10,
             use_threat_score=True,
             use_quiescence=True,
             use_enhanced_ordering=True,
-            quiescence_max_depth=1,
-            quiescence_candidate_limit=4,
+            use_killer_moves=True,
+            use_history_heuristic=True,
+            use_static_capture_ordering=True,
+            use_den_safety=True,
+            force_full_evaluation=True,
+            use_aspiration_windows=True,
+            use_late_move_reductions=True,
+            use_repetition_penalty=True,
+            use_den_race_score=True,
+            quiescence_max_depth=2,
+            quiescence_candidate_limit=6,
             threat_weight=1,
         )
 
@@ -98,11 +127,15 @@ class AlphaBetaAI:
         self.deadline = 0.0
         self.nodes = 0
         self.tt: dict[tuple, TTEntry] = {}
+        self.killer_moves: dict[int, list[tuple[int, int]]] = {}
+        self.history_scores: dict[tuple[int, int], int] = {}
 
     def choose_move(self, state: GameState) -> SearchResult:
         self.deadline = time.perf_counter() + self.time_limit_ms / 1000.0
         self.nodes = 0
         self.tt.clear()
+        self.killer_moves.clear()
+        self.history_scores.clear()
         best_move: Move | None = None
         best_score = -math.inf
         completed_depth = 0
@@ -118,10 +151,18 @@ class AlphaBetaAI:
                 elapsed_ms = (time.perf_counter() - start) * 1000
                 return SearchResult(tactical, self.evaluate(self.apply(state, tactical), state.side_to_move), 1, self.nodes, elapsed_ms)
 
-        for depth in range(1, MAX_DEPTH + 1):
+        for depth in range(1, self.config.max_depth + 1):
             if time.perf_counter() >= self.deadline:
                 break
-            score, move = self._search_root(state, depth, best_move)
+            if self.config.use_aspiration_windows and completed_depth > 0 and best_score not in {-math.inf, math.inf}:
+                window = self.config.aspiration_window
+                alpha = best_score - window
+                beta = best_score + window
+                score, move = self._search_root(state, depth, best_move, alpha, beta)
+                if time.perf_counter() < self.deadline and (score <= alpha or score >= beta):
+                    score, move = self._search_root(state, depth, best_move)
+            else:
+                score, move = self._search_root(state, depth, best_move)
             if move is not None:
                 best_move = move
                 best_score = score
@@ -174,6 +215,8 @@ class AlphaBetaAI:
                 score += 1_200
             if move.is_jump:
                 score += 2_600
+                if self.config.use_den_safety and move.captured is None and self.is_square_attacked(child, move.destination, opponent):
+                    score -= PIECE_VALUES[move.piece.kind] * 5
             distance = Position.from_index(move.destination).manhattan_distance(Position.from_index(target_den))
             if distance <= 1:
                 score += 2_400
@@ -192,22 +235,34 @@ class AlphaBetaAI:
                 return move
         return None
 
-    def _search_root(self, state: GameState, depth: int, preferred_move: Move | None) -> tuple[int, Move | None]:
+    def _search_root(
+        self,
+        state: GameState,
+        depth: int,
+        preferred_move: Move | None,
+        alpha: float = -math.inf,
+        beta: float = math.inf,
+    ) -> tuple[int, Move | None]:
         best_score = -math.inf
         best_move: Move | None = None
-        alpha = -math.inf
-        moves = self.order_moves(state, legal_moves(state), preferred_move=preferred_move, tactical=True)
+        moves = self.order_moves(state, legal_moves(state), preferred_move=preferred_move, tactical=True, ply=0)
         for move in moves:
-            score = -self._alphabeta(self.apply(state, move), depth - 1, -math.inf, -alpha)
+            child = self.apply(state, move)
+            score = -self._alphabeta(child, depth - 1, -beta, -alpha, 1)
+            if self.config.use_den_safety and self.is_unsafe_non_capture_jump(state, move, child):
+                score -= PIECE_VALUES[move.piece.kind] * 48
             if score > best_score:
                 best_score = score
                 best_move = move
             alpha = max(alpha, score)
+            if alpha >= beta:
+                self.record_cutoff(move, depth, 0)
+                break
             if time.perf_counter() >= self.deadline:
                 break
         return int(best_score), best_move
 
-    def _alphabeta(self, state: GameState, depth: int, alpha: float, beta: float) -> int:
+    def _alphabeta(self, state: GameState, depth: int, alpha: float, beta: float, ply: int = 0) -> int:
         if time.perf_counter() >= self.deadline:
             return self.evaluate(state, state.side_to_move)
         self.nodes += 1
@@ -245,14 +300,21 @@ class AlphaBetaAI:
         value = -math.inf
         best_move_key: tuple[int, int] | None = None
         preferred = self.move_from_key(moves, entry.best_move if entry is not None else None)
-        for move in self.order_moves(state, moves, preferred_move=preferred):
+        for move_index, move in enumerate(self.order_moves(state, moves, preferred_move=preferred, ply=ply)):
             child = self.apply(state, move)
-            score = -self._alphabeta(child, depth - 1, -beta, -alpha)
+            if self.should_reduce_late_move(state, move, move_index, depth):
+                reduced_depth = max(0, depth - 2)
+                score = -self._alphabeta(child, reduced_depth, -alpha - 1, -alpha, ply + 1)
+                if score > alpha:
+                    score = -self._alphabeta(child, depth - 1, -beta, -alpha, ply + 1)
+            else:
+                score = -self._alphabeta(child, depth - 1, -beta, -alpha, ply + 1)
             if score > value:
                 value = score
                 best_move_key = (move.origin, move.destination)
             alpha = max(alpha, score)
             if alpha >= beta:
+                self.record_cutoff(move, depth, ply)
                 break
 
         flag = EXACT
@@ -309,6 +371,7 @@ class AlphaBetaAI:
         moves: list[Move],
         preferred_move: Move | None = None,
         tactical: bool = False,
+        ply: int = 0,
     ) -> list[Move]:
         target_den = RED_DEN if state.side_to_move is Side.BLUE else BLUE_DEN
         opponent = state.side_to_move.opponent
@@ -322,6 +385,8 @@ class AlphaBetaAI:
                 score += 900_000
             if move.captured is not None:
                 score += 30_000 + PIECE_VALUES[move.captured.kind] * 20 - PIECE_VALUES[move.piece.kind]
+                if self.config.use_static_capture_ordering:
+                    score += self.static_exchange_score(state, move)
             if move.destination == target_den:
                 score += 800_000
             if move.is_jump:
@@ -341,6 +406,16 @@ class AlphaBetaAI:
                     score -= PIECE_VALUES[move.piece.kind] * 8
                 if move.destination in self.own_traps_for(state.side_to_move):
                     score += 400
+            if self.config.use_den_safety and move.is_jump and move.captured is None:
+                if self.is_square_attacked(child, move.destination, opponent) and child.winner is None:
+                    score -= PIECE_VALUES[move.piece.kind] * 24
+            move_key = (move.origin, move.destination)
+            if self.config.use_killer_moves and move.captured is None and move_key in self.killer_moves.get(ply, []):
+                score += 16_000
+            if self.config.use_history_heuristic and move.captured is None:
+                score += self.history_scores.get(move_key, 0)
+            if self.config.use_repetition_penalty and move.captured is None and self.is_recent_reversal(state, move):
+                score -= self.config.repetition_penalty * 6
             return score
 
         return sorted(moves, key=move_score, reverse=True)
@@ -351,7 +426,7 @@ class AlphaBetaAI:
         if state.winner is perspective.opponent:
             return -TERMINAL_SCORE
 
-        if self.profile is SearchProfile.FAST:
+        if self.profile is SearchProfile.FAST and not self.config.force_full_evaluation:
             return self.fast_evaluate(state, perspective)
 
         score = self.fast_evaluate(state, perspective)
@@ -360,6 +435,15 @@ class AlphaBetaAI:
         if self.config.use_threat_score:
             score += self.config.threat_weight * self.threat_score(state, perspective)
             score -= self.config.threat_weight * self.threat_score(state, perspective.opponent)
+        if self.config.use_den_safety:
+            score += self.den_safety_score(state, perspective)
+            score -= self.den_safety_score(state, perspective.opponent)
+        if self.config.use_den_race_score:
+            score += self.den_race_score(state, perspective)
+            score -= self.den_race_score(state, perspective.opponent)
+        if self.config.use_repetition_penalty:
+            score += self.repetition_score(state, perspective)
+            score -= self.repetition_score(state, perspective.opponent)
         return score
 
     def fast_evaluate(self, state: GameState, perspective: Side) -> int:
@@ -439,6 +523,113 @@ class AlphaBetaAI:
                 score += PIECE_VALUES[move.captured.kind]
         return score
 
+    def den_safety_score(self, state: GameState, side: Side) -> int:
+        own_den = BLUE_DEN if side is Side.BLUE else RED_DEN
+        opponent = side.opponent
+        score = 0
+        for index, piece in enumerate(state.board):
+            if piece is None or piece.side is not opponent:
+                continue
+            distance = Position.from_index(index).manhattan_distance(Position.from_index(own_den))
+            if distance <= 3:
+                score -= (4 - distance) * 520
+            if index in self.own_traps_for(side):
+                score -= 420
+        return score
+
+    def den_race_score(self, state: GameState, side: Side) -> int:
+        target_den = RED_DEN if side is Side.BLUE else BLUE_DEN
+        pieces = [(index, piece) for index, piece in enumerate(state.board) if piece is not None and piece.side is side]
+        if not pieces:
+            return -4_000
+
+        score = len(pieces) * 20
+        closest_distance = min(
+            Position.from_index(index).manhattan_distance(Position.from_index(target_den))
+            for index, _piece in pieces
+        )
+        score += (16 - closest_distance) * 70
+        if closest_distance <= 3:
+            score += (4 - closest_distance) * 680
+
+        for index, piece in pieces:
+            distance = Position.from_index(index).manhattan_distance(Position.from_index(target_den))
+            if distance <= 4:
+                score += (5 - distance) * 95
+                score += self.defender_count(state, index, piece.side) * 90
+            if index in self.enemy_traps_for(side):
+                score += 360
+        return score
+
+    def defender_count(self, state: GameState, index: int, side: Side) -> int:
+        count = 0
+        for adjacent in neighbors(index):
+            piece = state.board[adjacent]
+            if piece is not None and piece.side is side:
+                count += 1
+        return count
+
+    def repetition_score(self, state: GameState, side: Side) -> int:
+        side_moves = [move for move in state.move_history if move.piece.side is side]
+        if len(side_moves) < 2:
+            return 0
+        previous, latest = side_moves[-2], side_moves[-1]
+        if previous.origin == latest.destination and previous.destination == latest.origin:
+            return -self.config.repetition_penalty
+        return 0
+
+    def is_recent_reversal(self, state: GameState, move: Move) -> bool:
+        for previous in reversed(state.move_history):
+            if previous.piece.side is move.piece.side:
+                return previous.origin == move.destination and previous.destination == move.origin
+        return False
+
+    def is_unsafe_non_capture_jump(self, state: GameState, move: Move, child: GameState | None = None) -> bool:
+        if not move.is_jump or move.captured is not None:
+            return False
+        child_state = self.apply(state, move) if child is None else child
+        return self.is_square_attacked(child_state, move.destination, state.side_to_move.opponent)
+
+    def static_exchange_score(self, state: GameState, move: Move) -> int:
+        if move.captured is None:
+            return 0
+        child = self.apply(state, move)
+        score = PIECE_VALUES[move.captured.kind] - PIECE_VALUES[move.piece.kind]
+        if self.is_square_attacked(child, move.destination, state.side_to_move.opponent):
+            score -= PIECE_VALUES[move.piece.kind]
+        else:
+            score += PIECE_VALUES[move.captured.kind] // 2
+        return score * 4
+
+    def record_cutoff(self, move: Move, depth: int, ply: int) -> None:
+        if move.captured is not None:
+            return
+        move_key = (move.origin, move.destination)
+        if self.config.use_killer_moves:
+            killers = self.killer_moves.setdefault(ply, [])
+            if move_key not in killers:
+                killers.insert(0, move_key)
+                del killers[2:]
+        if self.config.use_history_heuristic:
+            self.history_scores[move_key] = self.history_scores.get(move_key, 0) + depth * depth
+
+    def should_reduce_late_move(self, state: GameState, move: Move, move_index: int, depth: int) -> bool:
+        if not self.config.use_late_move_reductions:
+            return False
+        if depth < self.config.lmr_min_depth or move_index < self.config.lmr_move_threshold:
+            return False
+        if not self.is_quiet_move(state, move):
+            return False
+        return True
+
+    def is_quiet_move(self, state: GameState, move: Move) -> bool:
+        if move.captured is not None or move.is_jump:
+            return False
+        target_den = RED_DEN if state.side_to_move is Side.BLUE else BLUE_DEN
+        if move.destination == target_den or move.destination in self.enemy_traps_for(state.side_to_move):
+            return False
+        return True
+
     def is_square_attacked(self, state: GameState, index: int, by_side: Side) -> bool:
         if state.winner is not None:
             return False
@@ -471,4 +662,10 @@ class AlphaBetaAI:
 
     def _hash_state(self, state: GameState) -> tuple:
         board_key = tuple(None if piece is None else (piece.side.value, piece.kind.name) for piece in state.board)
-        return board_key, state.side_to_move.value, state.result.value, state.winner.value if state.winner else None
+        history_key = ()
+        if self.config.use_repetition_penalty:
+            history_key = tuple(
+                (move.origin, move.destination, move.piece.side.value, move.piece.kind.name)
+                for move in state.move_history[-4:]
+            )
+        return board_key, state.side_to_move.value, state.result.value, state.winner.value if state.winner else None, history_key

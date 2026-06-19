@@ -32,7 +32,7 @@ Run tests:
 python -m pytest
 ```
 
-Compare baseline and candidate AI strength:
+Compare AI strength across baseline, medium, and hard profiles, including fixed positions and head-to-head scenarios:
 
 ```powershell
 python -m tools.ai_benchmark

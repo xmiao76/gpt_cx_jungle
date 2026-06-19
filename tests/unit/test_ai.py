@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from jungle.ai import AlphaBetaAI, SearchConfig
-from jungle.domain import Piece, PieceType, Position, Side
+from jungle.domain import Move, Piece, PieceType, Position, Side
 from jungle.engine import Game
 
 
@@ -136,3 +136,64 @@ def test_candidate_ai_can_use_lion_three_square_span_jump() -> None:
 
     assert result.move is not None
     assert result.move.destination == landing
+
+
+def test_hard_search_config_is_distinct_profile() -> None:
+    hard = SearchConfig.hard()
+
+    assert hard.label == "hard"
+    assert hard.use_enhanced_ordering
+    assert hard.use_quiescence
+    assert hard.use_killer_moves
+    assert hard.use_history_heuristic
+    assert hard.use_den_safety
+
+
+def test_hard_search_config_enables_game_strength_features() -> None:
+    hard = SearchConfig.hard()
+
+    assert hard.force_full_evaluation
+    assert hard.use_aspiration_windows
+    assert hard.use_late_move_reductions
+    assert hard.use_repetition_penalty
+    assert hard.use_den_race_score
+
+
+def test_hard_ai_avoids_unsafe_non_capture_jump() -> None:
+    lion = Position(3, 0).index
+    unsafe_landing = Position(3, 3).index
+    state = make_state(
+        {
+            lion: Piece(Side.BLUE, PieceType.LION),
+            Position(6, 6).index: Piece(Side.BLUE, PieceType.RAT),
+            Position(2, 3).index: Piece(Side.RED, PieceType.LION),
+            Position(8, 6).index: Piece(Side.RED, PieceType.RAT),
+        }
+    )
+
+    ai = AlphaBetaAI(300, SearchConfig.hard())
+    result = ai.choose_move(state)
+
+    assert result.move is not None
+    assert result.move.destination != unsafe_landing
+
+
+def test_hard_ai_detects_recent_reversal_from_move_history() -> None:
+    cat = Piece(Side.BLUE, PieceType.CAT)
+    state = make_state(
+        {
+            Position(3, 3).index: cat,
+            Position(8, 6).index: Piece(Side.RED, PieceType.RAT),
+        }
+    )
+    state.move_history = [
+        Move(Position(2, 3).index, Position(3, 3).index, cat),
+        Move(Position(0, 6).index, Position(1, 6).index, Piece(Side.RED, PieceType.TIGER)),
+    ]
+    reversing_move = Move(Position(3, 3).index, Position(2, 3).index, cat)
+    forward_move = Move(Position(3, 3).index, Position(4, 3).index, cat)
+
+    ai = AlphaBetaAI(300, SearchConfig.hard())
+
+    assert ai.is_recent_reversal(state, reversing_move)
+    assert not ai.is_recent_reversal(state, forward_move)
