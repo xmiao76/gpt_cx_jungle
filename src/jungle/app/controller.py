@@ -27,7 +27,7 @@ DIFFICULTY_CONFIGS = {
         use_enhanced_ordering=True,
         threat_weight=1,
     ),
-    "hard": SearchConfig.candidate(),
+    "hard": SearchConfig.hard(),
 }
 
 
