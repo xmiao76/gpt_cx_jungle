@@ -101,8 +101,8 @@ def test_ai_rat_captures_elephant_but_elephant_does_not_chase_rat() -> None:
 
 def test_search_config_baseline_preserves_default_constructor() -> None:
     game = Game()
-    default = AlphaBetaAI(80).choose_move(game.state)
-    baseline = AlphaBetaAI(80, SearchConfig.baseline()).choose_move(game.state)
+    default = AlphaBetaAI(10_000, node_limit=500).choose_move(game.state)
+    baseline = AlphaBetaAI(10_000, SearchConfig.baseline(), node_limit=500).choose_move(game.state)
 
     assert default.move is not None
     assert baseline.move is not None

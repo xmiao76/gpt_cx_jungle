@@ -21,6 +21,7 @@ REQUIRED_DISCLOSURES = (
     f"Model used: {MODEL_NAME}",
     f"Code agent used: {AGENT_NAME}",
 )
+PRESERVED_RELEASE_NAMES = frozenset({"Capture.PNG", "knownIssue.txt"})
 SPEC_TEMPLATE = """
 a = Analysis(
     ['src/jungle/__main__.py'],
@@ -102,8 +103,18 @@ def write_spec(spec_path: Path = SPEC) -> None:
 
 def clean(paths: tuple[Path, ...] = (DIST, BUILD, RELEASE)) -> None:
     for path in paths:
-        if path.exists():
+        if not path.exists():
+            continue
+        if path.name.casefold() != "release":
             shutil.rmtree(path)
+            continue
+        for child in path.iterdir():
+            if child.name in PRESERVED_RELEASE_NAMES:
+                continue
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
 
 
 def generate_assets() -> None:
@@ -117,7 +128,7 @@ def build_bundle(spec_path: Path = SPEC) -> Path:
 
 
 def assemble_release(bundle_dir: Path, release_dir: Path = RELEASE) -> None:
-    shutil.copytree(bundle_dir, release_dir)
+    shutil.copytree(bundle_dir, release_dir, dirs_exist_ok=True)
 
 
 def write_release_readme(release_dir: Path = RELEASE) -> Path:

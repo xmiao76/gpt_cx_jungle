@@ -48,4 +48,4 @@
 - [x] Replace duplicated deterministic games with varied legal paired openings and node-limited comparisons.
 - [x] Gate all 11 tactical positions, a Hard score of at least 0.60 across match games, legal moves, and the two-second Hard response target.
 - [x] Update benchmark documentation and run the complete test suite.
-- [ ] Rebuild the release, run packaged smoke validation, review the diff, and commit the final checkpoint.
+- [x] Rebuild the release, run packaged smoke validation, review the diff, and commit the final checkpoint.

@@ -57,6 +57,37 @@ def test_write_spec_uses_static_local_package_resolution(tmp_path) -> None:
     assert "pathex=['src']" in content
 
 
+def test_clean_preserves_user_release_evidence(tmp_path) -> None:
+    release_dir = tmp_path / "release"
+    internal_dir = release_dir / "_internal"
+    internal_dir.mkdir(parents=True)
+    (release_dir / "Capture.PNG").write_text("screenshot", encoding="utf-8")
+    (release_dir / "knownIssue.txt").write_text("notes", encoding="utf-8")
+    (release_dir / "Jungle.exe").write_text("old binary", encoding="utf-8")
+    (internal_dir / "runtime.dll").write_text("old runtime", encoding="utf-8")
+
+    package_release.clean((release_dir,))
+
+    assert (release_dir / "Capture.PNG").read_text(encoding="utf-8") == "screenshot"
+    assert (release_dir / "knownIssue.txt").read_text(encoding="utf-8") == "notes"
+    assert not (release_dir / "Jungle.exe").exists()
+    assert not internal_dir.exists()
+
+
+def test_assemble_release_merges_bundle_with_preserved_files(tmp_path) -> None:
+    bundle_dir = tmp_path / "bundle"
+    release_dir = tmp_path / "release"
+    bundle_dir.mkdir()
+    release_dir.mkdir()
+    (bundle_dir / "Jungle.exe").write_text("new binary", encoding="utf-8")
+    (release_dir / "Capture.PNG").write_text("screenshot", encoding="utf-8")
+
+    package_release.assemble_release(bundle_dir, release_dir)
+
+    assert (release_dir / "Jungle.exe").read_text(encoding="utf-8") == "new binary"
+    assert (release_dir / "Capture.PNG").read_text(encoding="utf-8") == "screenshot"
+
+
 def test_verify_release_artifacts_requires_required_statements(tmp_path, monkeypatch) -> None:
     release_dir = tmp_path / "release"
     internal_dir = release_dir / "_internal"
