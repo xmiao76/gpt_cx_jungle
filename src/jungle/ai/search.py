@@ -228,9 +228,13 @@ class AlphaBetaAI:
             self._check_limits()
             child = self.apply(state, move)
             score = self._search_child(child, depth - 1, alpha, beta, 1, move_index > 0)
+            unsafe_penalty = 0
             if self.config.use_den_safety and self.is_unsafe_non_capture_jump(state, move, child):
-                score -= PIECE_VALUES[move.piece.kind] * 48
+                unsafe_penalty = PIECE_VALUES[move.piece.kind] * 48
+                score -= unsafe_penalty
             move_tie_rank = tie_rank[(move.origin, move.destination)]
+            if score == best_score and move_tie_rank < best_tie_rank:
+                score = self._search_child(child, depth - 1, -math.inf, math.inf, 1, False) - unsafe_penalty
             if score > best_score or (score == best_score and move_tie_rank < best_tie_rank):
                 best_score = score
                 best_move = move
@@ -326,7 +330,7 @@ class AlphaBetaAI:
     ) -> int:
         key = position_key(child)
         if self.config.use_cycle_detection and self.path_counts[key] > 0:
-            return 0
+            return -self.config.repetition_penalty * 8
         if self.config.use_cycle_detection:
             self.path_counts[key] += 1
         try:

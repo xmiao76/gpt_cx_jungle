@@ -341,7 +341,7 @@ def test_principal_variation_search_uses_null_windows_for_later_moves() -> None:
     assert any(math.isfinite(alpha) and math.isfinite(beta) and beta - alpha == 1 for alpha, beta in ai.windows)
 
 
-def test_cycle_detection_scores_seen_child_without_recursing() -> None:
+def test_cycle_detection_penalizes_seen_child_without_recursing() -> None:
     class CycleProbeAI(AlphaBetaAI):
         def _alphabeta(self, state, depth, alpha, beta, ply=0):
             raise AssertionError("repeated position must not be searched again")
@@ -354,7 +354,7 @@ def test_cycle_detection_scores_seen_child_without_recursing() -> None:
 
     score = ai._negamax_child(child, 2, -math.inf, math.inf, 1)
 
-    assert score == 0
+    assert score == -SearchConfig.hard().repetition_penalty * 8
 
 
 def test_equal_root_scores_use_static_tactical_tie_break() -> None:
@@ -379,6 +379,35 @@ def test_equal_root_scores_use_static_tactical_tie_break() -> None:
 
     assert move is not None
     assert move.destination == Position(2, 1).index
+
+
+def test_root_tie_break_does_not_treat_alpha_bound_as_exact() -> None:
+    class BoundScoreAI(AlphaBetaAI):
+        def _search_child(self, child, depth, alpha, beta, ply, later_move):
+            elephant_alive = any(
+                piece is not None and piece.side is Side.RED and piece.kind is PieceType.ELEPHANT
+                for piece in child.board
+            )
+            if elephant_alive:
+                return 0
+            return -100 if math.isinf(alpha) and math.isinf(beta) else alpha
+
+    rat = Piece(Side.BLUE, PieceType.RAT)
+    state = make_state(
+        {
+            Position(2, 0).index: rat,
+            Position(2, 1).index: Piece(Side.RED, PieceType.ELEPHANT),
+            Position(8, 6).index: Piece(Side.RED, PieceType.LION),
+        }
+    )
+    safe = next(move for move in legal_moves(state) if move.captured is None)
+    ai = BoundScoreAI(1_000, SearchConfig.hard())
+    ai.deadline = time.perf_counter() + 1
+
+    _score, move = ai._search_root(state, 2, safe)
+
+    assert move is not None
+    assert move.destination != Position(2, 1).index
 
 
 def test_quiescence_uses_ply_aware_terminal_score() -> None:
