@@ -350,15 +350,19 @@ class AlphaBetaAI:
         if not moves:
             return -TERMINAL_SCORE + ply
 
+        under_den_threat = self.has_immediate_den_threat(state)
         stand_pat = self.evaluate(state, state.side_to_move)
-        if stand_pat >= beta:
-            return int(beta)
-        alpha = max(alpha, stand_pat)
+        if not under_den_threat:
+            if stand_pat >= beta:
+                return int(beta)
+            alpha = max(alpha, stand_pat)
         if extension_depth >= self.config.quiescence_max_depth or state.result_reason:
-            return int(alpha)
+            return int(stand_pat if under_den_threat else alpha)
 
-        candidates = self.forcing_moves(state, moves)
+        candidates = self.forcing_moves(state, moves, under_den_threat=under_den_threat)
         if not candidates:
+            if under_den_threat:
+                return -TERMINAL_SCORE + ply
             return int(alpha)
 
         for move in self.order_moves(state, candidates, tactical=True)[: self.config.quiescence_candidate_limit]:
@@ -369,7 +373,13 @@ class AlphaBetaAI:
             alpha = max(alpha, score)
         return int(alpha)
 
-    def forcing_moves(self, state: GameState, moves: list[Move] | None = None) -> list[Move]:
+    def forcing_moves(
+        self,
+        state: GameState,
+        moves: list[Move] | None = None,
+        *,
+        under_den_threat: bool | None = None,
+    ) -> list[Move]:
         target_den = RED_DEN if state.side_to_move is Side.BLUE else BLUE_DEN
         own_den = BLUE_DEN if state.side_to_move is Side.BLUE else RED_DEN
         moves = legal_moves(state) if moves is None else moves
@@ -379,19 +389,26 @@ class AlphaBetaAI:
             if move.captured is not None or move.destination == target_den or move.destination in self.enemy_traps_for(state.side_to_move)
         ]
 
-        opponent_state = self.with_side_to_move(state, state.side_to_move.opponent)
-        if not any(move.destination == own_den for move in legal_moves(opponent_state)):
+        if under_den_threat is None:
+            under_den_threat = self.has_immediate_den_threat(state)
+        if not under_den_threat:
             return forcing
 
-        forcing_keys = {(move.origin, move.destination) for move in forcing}
+        defenses: list[Move] = []
         for move in moves:
-            if (move.origin, move.destination) in forcing_keys:
-                continue
             child = self.apply(state, move)
+            if child.winner is state.side_to_move:
+                defenses.append(move)
+                continue
             reply_state = self.with_side_to_move(child, state.side_to_move.opponent)
             if not any(reply.destination == own_den for reply in legal_moves(reply_state)):
-                forcing.append(move)
-        return forcing
+                defenses.append(move)
+        return defenses
+
+    def has_immediate_den_threat(self, state: GameState) -> bool:
+        own_den = BLUE_DEN if state.side_to_move is Side.BLUE else RED_DEN
+        opponent_state = self.with_side_to_move(state, state.side_to_move.opponent)
+        return any(move.destination == own_den for move in legal_moves(opponent_state))
 
     def order_moves(
         self,

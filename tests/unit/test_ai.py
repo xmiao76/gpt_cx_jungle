@@ -283,6 +283,25 @@ def test_forcing_move_generation_is_static_without_den_threat() -> None:
     assert any(move.destination == Position(2, 1).index for move in forcing)
 
 
+def test_forcing_moves_under_den_threat_exclude_irrelevant_captures() -> None:
+    state = make_state(
+        {
+            Position(7, 3).index: Piece(Side.RED, PieceType.CAT),
+            Position(7, 2).index: Piece(Side.BLUE, PieceType.DOG),
+            Position(2, 0).index: Piece(Side.BLUE, PieceType.RAT),
+            Position(2, 1).index: Piece(Side.RED, PieceType.ELEPHANT),
+            Position(0, 0).index: Piece(Side.RED, PieceType.LION),
+        },
+        Side.BLUE,
+    )
+    ai = AlphaBetaAI(1_000, SearchConfig.hard())
+
+    forcing = ai.forcing_moves(state, under_den_threat=True)
+
+    assert any(move.destination == Position(7, 3).index for move in forcing)
+    assert all(move.destination != Position(2, 1).index for move in forcing)
+
+
 def test_terminal_scores_prefer_faster_wins_and_slower_losses() -> None:
     state = make_state({Position(0, 3).index: Piece(Side.BLUE, PieceType.CAT)}, Side.RED)
     state.winner = Side.BLUE
@@ -419,6 +438,44 @@ def test_quiescence_uses_ply_aware_terminal_score() -> None:
     score = ai._quiescence(state, -math.inf, math.inf, extension_depth=0, ply=5)
 
     assert score == -TERMINAL_SCORE + 5
+
+
+def test_quiescence_cannot_stand_pat_under_immediate_den_threat() -> None:
+    class OptimisticEvaluationAI(AlphaBetaAI):
+        def evaluate(self, state, perspective):
+            return 10_000
+
+    state = make_state(
+        {
+            Position(7, 3).index: Piece(Side.RED, PieceType.CAT),
+            Position(7, 2).index: Piece(Side.BLUE, PieceType.DOG),
+            Position(0, 0).index: Piece(Side.RED, PieceType.LION),
+        },
+        Side.BLUE,
+    )
+    ai = OptimisticEvaluationAI(1_000, SearchConfig.hard())
+    ai.deadline = time.perf_counter() + 1
+
+    score = ai._quiescence(state, -math.inf, 0, extension_depth=0, ply=0)
+
+    assert score < 0
+
+
+def test_quiescence_scores_unavoidable_den_threat_as_loss() -> None:
+    state = make_state(
+        {
+            Position(7, 3).index: Piece(Side.RED, PieceType.CAT),
+            Position(6, 0).index: Piece(Side.BLUE, PieceType.CAT),
+            Position(0, 0).index: Piece(Side.RED, PieceType.LION),
+        },
+        Side.BLUE,
+    )
+    ai = AlphaBetaAI(1_000, SearchConfig.hard())
+    ai.deadline = time.perf_counter() + 1
+
+    score = ai._quiescence(state, -math.inf, math.inf, extension_depth=0, ply=4)
+
+    assert score == -TERMINAL_SCORE + 4
 
 
 def test_choose_move_handles_state_with_no_legal_moves() -> None:
