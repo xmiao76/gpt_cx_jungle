@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+
 from jungle.domain import BLUE_DEN, RED_DEN, GameState, Move, ResultType, Side
 
 
@@ -30,7 +32,7 @@ def apply_search_move(state: GameState, move: Move) -> GameState:
         return child
 
     opponent = move.piece.side.opponent
-    if not any(piece is not None and piece.side is opponent for piece in board):
+    if move.captured is not None and not any(piece is not None and piece.side is opponent for piece in board):
         child.winner = move.piece.side
         child.result = ResultType.CAPTURE_ALL
         winner = "Blue" if move.piece.side is Side.BLUE else "Red"
@@ -46,3 +48,17 @@ def board_key(state: GameState) -> tuple:
 def position_key(state: GameState) -> tuple:
     return board_key(state), state.side_to_move.value
 
+
+def recent_position_counts(state: GameState) -> Counter[tuple]:
+    counts: Counter[tuple] = Counter()
+    board = state.board.copy()
+    side_to_move = state.side_to_move
+    counts[(tuple(None if piece is None else (piece.side.value, piece.kind.value) for piece in board), side_to_move.value)] += 1
+
+    for move in reversed(state.move_history[-SEARCH_HISTORY_LIMIT:]):
+        board[move.origin] = move.piece
+        board[move.destination] = move.captured
+        side_to_move = move.piece.side
+        key = tuple(None if piece is None else (piece.side.value, piece.kind.value) for piece in board), side_to_move.value
+        counts[key] += 1
+    return counts

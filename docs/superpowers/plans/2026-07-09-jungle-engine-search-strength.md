@@ -30,11 +30,11 @@
 - Modify: `src/jungle/ai/search.py`
 - Test: `tests/unit/test_ai.py`
 
-- [ ] Add failing tests for ply-aware wins, static ordering, PVS equivalence, positional evaluation, and cycle avoidance.
-- [ ] Remove speculative tactical early returns and recursive search work from move ordering.
-- [ ] Implement principal-variation search, TT mate-score normalization, conservative LMR re-search, bounded quiescence, and path repetition handling.
-- [ ] Implement bounded Jungle evaluation for material, traps, den pressure/safety, mobility, rat roles, and jump lanes.
-- [ ] Run focused and full unit tests and commit the passing checkpoint.
+- [x] Add failing tests for ply-aware wins, static ordering, PVS behavior, positional evaluation, and cycle avoidance.
+- [x] Remove speculative tactical early returns and recursive search work from move ordering.
+- [x] Implement principal-variation search, TT mate-score normalization, conservative LMR re-search, bounded quiescence, and path repetition handling.
+- [x] Implement bounded Jungle evaluation for material, traps, den pressure/safety, mobility, rat roles, and jump lanes.
+- [x] Run focused and full unit tests and commit the passing checkpoint.
 
 ### Task 3: Strength and Release Validation
 

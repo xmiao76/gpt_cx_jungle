@@ -96,3 +96,27 @@ def test_search_transition_keeps_only_recent_history() -> None:
 
     assert len(result.move_history) == SEARCH_HISTORY_LIMIT
     assert result.move_history[-1] == move
+
+
+def test_recent_position_counts_reconstructs_reversible_cycle() -> None:
+    from jungle.ai.position import position_key, recent_position_counts
+
+    game = Game(
+        make_state(
+            {
+                Position(6, 0).index: Piece(Side.BLUE, PieceType.CAT),
+                Position(2, 6).index: Piece(Side.RED, PieceType.CAT),
+            }
+        )
+    )
+    for origin, destination in (
+        (Position(6, 0).index, Position(5, 0).index),
+        (Position(2, 6).index, Position(3, 6).index),
+        (Position(5, 0).index, Position(6, 0).index),
+        (Position(3, 6).index, Position(2, 6).index),
+    ):
+        game.apply_coordinates(origin, destination)
+
+    counts = recent_position_counts(game.state)
+
+    assert counts[position_key(game.state)] == 2
