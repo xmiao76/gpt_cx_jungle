@@ -20,8 +20,9 @@ from jungle.domain import (
     TRAP_OWNER,
     neighbors,
 )
-from jungle.engine import Game
 from jungle.rules import legal_moves
+
+from .position import apply_search_move
 
 
 TERMINAL_SCORE = 100_000
@@ -29,6 +30,10 @@ MAX_DEPTH = 8
 EXACT = "exact"
 LOWER = "lower"
 UPPER = "upper"
+
+
+class _SearchAborted(Exception):
+    pass
 
 PIECE_VALUES = {
     PieceType.RAT: 130,
@@ -120,9 +125,16 @@ class TTEntry:
 
 
 class AlphaBetaAI:
-    def __init__(self, time_limit_ms: int = 1000, config: SearchConfig | None = None) -> None:
+    def __init__(
+        self,
+        time_limit_ms: int = 1000,
+        config: SearchConfig | None = None,
+        *,
+        node_limit: int | None = None,
+    ) -> None:
         self.time_limit_ms = time_limit_ms
         self.config = SearchConfig.baseline() if config is None else config
+        self.node_limit = node_limit
         self.profile = SearchProfile.FAST if time_limit_ms <= 350 else SearchProfile.FULL
         self.deadline = 0.0
         self.nodes = 0
@@ -145,24 +157,20 @@ class AlphaBetaAI:
         if tactical is not None:
             elapsed_ms = (time.perf_counter() - start) * 1000
             return SearchResult(tactical, self.evaluate(self.apply(state, tactical), state.side_to_move), 1, self.nodes, elapsed_ms)
-        if self.config.use_enhanced_ordering:
-            tactical = self.find_enhanced_tactical_move(state)
-            if tactical is not None:
-                elapsed_ms = (time.perf_counter() - start) * 1000
-                return SearchResult(tactical, self.evaluate(self.apply(state, tactical), state.side_to_move), 1, self.nodes, elapsed_ms)
-
         for depth in range(1, self.config.max_depth + 1):
-            if time.perf_counter() >= self.deadline:
-                break
-            if self.config.use_aspiration_windows and completed_depth > 0 and best_score not in {-math.inf, math.inf}:
-                window = self.config.aspiration_window
-                alpha = best_score - window
-                beta = best_score + window
-                score, move = self._search_root(state, depth, best_move, alpha, beta)
-                if time.perf_counter() < self.deadline and (score <= alpha or score >= beta):
+            try:
+                self._check_limits()
+                if self.config.use_aspiration_windows and completed_depth > 0 and best_score not in {-math.inf, math.inf}:
+                    window = self.config.aspiration_window
+                    alpha = best_score - window
+                    beta = best_score + window
+                    score, move = self._search_root(state, depth, best_move, alpha, beta)
+                    if score <= alpha or score >= beta:
+                        score, move = self._search_root(state, depth, best_move)
+                else:
                     score, move = self._search_root(state, depth, best_move)
-            else:
-                score, move = self._search_root(state, depth, best_move)
+            except _SearchAborted:
+                break
             if move is not None:
                 best_move = move
                 best_score = score
@@ -170,7 +178,8 @@ class AlphaBetaAI:
         elapsed_ms = (time.perf_counter() - start) * 1000
         if best_move is None:
             moves = legal_moves(state)
-            best_move = moves[0] if moves else None
+            ordered = self.order_moves(state, moves) if moves else []
+            best_move = ordered[0] if ordered else None
             best_score = self.evaluate(state, state.side_to_move)
         return SearchResult(best_move, int(best_score), completed_depth, self.nodes, elapsed_ms)
 
@@ -247,6 +256,7 @@ class AlphaBetaAI:
         best_move: Move | None = None
         moves = self.order_moves(state, legal_moves(state), preferred_move=preferred_move, tactical=True, ply=0)
         for move in moves:
+            self._check_limits()
             child = self.apply(state, move)
             score = -self._alphabeta(child, depth - 1, -beta, -alpha, 1)
             if self.config.use_den_safety and self.is_unsafe_non_capture_jump(state, move, child):
@@ -258,14 +268,10 @@ class AlphaBetaAI:
             if alpha >= beta:
                 self.record_cutoff(move, depth, 0)
                 break
-            if time.perf_counter() >= self.deadline:
-                break
         return int(best_score), best_move
 
     def _alphabeta(self, state: GameState, depth: int, alpha: float, beta: float, ply: int = 0) -> int:
-        if time.perf_counter() >= self.deadline:
-            return self.evaluate(state, state.side_to_move)
-        self.nodes += 1
+        self._visit_node()
 
         key = self._hash_state(state)
         alpha_original = alpha
@@ -327,9 +333,7 @@ class AlphaBetaAI:
         return entry_score
 
     def _quiescence(self, state: GameState, alpha: float, beta: float, extension_depth: int) -> int:
-        if time.perf_counter() >= self.deadline:
-            return self.evaluate(state, state.side_to_move)
-        self.nodes += 1
+        self._visit_node()
 
         stand_pat = self.evaluate(state, state.side_to_move)
         if stand_pat >= beta:
@@ -343,8 +347,7 @@ class AlphaBetaAI:
             return int(alpha)
 
         for move in self.order_moves(state, candidates, tactical=True)[: self.config.quiescence_candidate_limit]:
-            if time.perf_counter() >= self.deadline:
-                break
+            self._check_limits()
             score = -self._quiescence(self.apply(state, move), -beta, -alpha, extension_depth + 1)
             if score >= beta:
                 return int(beta)
@@ -656,9 +659,17 @@ class AlphaBetaAI:
         return None
 
     def apply(self, state: GameState, move: Move) -> GameState:
-        game = Game(state)
-        game.apply_move(move)
-        return game.state.copy()
+        return apply_search_move(state, move)
+
+    def _check_limits(self) -> None:
+        if time.perf_counter() >= self.deadline:
+            raise _SearchAborted
+        if self.node_limit is not None and self.nodes >= self.node_limit:
+            raise _SearchAborted
+
+    def _visit_node(self) -> None:
+        self._check_limits()
+        self.nodes += 1
 
     def _hash_state(self, state: GameState) -> tuple:
         board_key = tuple(None if piece is None else (piece.side.value, piece.kind.name) for piece in state.board)

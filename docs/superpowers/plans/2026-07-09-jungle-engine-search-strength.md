@@ -18,10 +18,10 @@
 - Test: `tests/unit/test_ai.py`
 - Test: `tests/unit/test_ai_position.py`
 
-- [ ] Add failing tests proving incomplete iterations do not replace the last completed result and fallback moves are legal.
-- [ ] Add failing parity tests for lightweight board, turn, capture, history, den-win, and capture-all transitions.
-- [ ] Implement explicit deadline/node-limit abort handling and a bounded-history search transition.
-- [ ] Run focused tests and commit the passing checkpoint.
+- [x] Add failing tests proving incomplete iterations do not replace the last completed result and fallback moves are legal.
+- [x] Add failing parity tests for lightweight board, turn, capture, history, den-win, and capture-all transitions.
+- [x] Implement explicit deadline/node-limit abort handling and a bounded-history search transition.
+- [x] Run focused tests and commit the passing checkpoint.
 
 ### Task 2: Efficient Strong Search
 
@@ -49,4 +49,3 @@
 - [ ] Gate all 11 tactical positions, a Hard score of at least 0.60 against Baseline, legal moves, and the two-second Hard response target.
 - [ ] Update benchmark documentation and run the complete test suite.
 - [ ] Rebuild the release, run packaged smoke validation, review the diff, and commit the final checkpoint.
-

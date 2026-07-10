@@ -3,6 +3,7 @@ from __future__ import annotations
 from jungle.ai import AlphaBetaAI, SearchConfig
 from jungle.domain import Move, Piece, PieceType, Position, Side
 from jungle.engine import Game
+from jungle.rules import legal_moves
 
 
 def make_state(pieces, side_to_move=Side.BLUE):
@@ -197,3 +198,45 @@ def test_hard_ai_detects_recent_reversal_from_move_history() -> None:
 
     assert ai.is_recent_reversal(state, reversing_move)
     assert not ai.is_recent_reversal(state, forward_move)
+
+
+def test_node_limit_keeps_last_fully_completed_iteration() -> None:
+    game = Game()
+    root_move_count = len(legal_moves(game.state))
+    config = SearchConfig(label="node-limited", max_depth=4)
+
+    result = AlphaBetaAI(10_000, config, node_limit=root_move_count + 1).choose_move(game.state)
+
+    assert result.move in legal_moves(game.state)
+    assert result.depth == 1
+    assert result.nodes == root_move_count + 1
+
+
+def test_hard_search_does_not_use_speculative_tactical_shortcut() -> None:
+    class ShortcutProbeAI(AlphaBetaAI):
+        def find_enhanced_tactical_move(self, state):
+            raise AssertionError("speculative shortcut must not run")
+
+    result = ShortcutProbeAI(10_000, SearchConfig.hard(), node_limit=0).choose_move(Game().state)
+
+    assert result.move in legal_moves(Game().state)
+    assert result.depth == 0
+
+
+def test_zero_budget_fallback_uses_static_capture_ordering() -> None:
+    rat = Piece(Side.BLUE, PieceType.RAT)
+    elephant = Piece(Side.RED, PieceType.ELEPHANT)
+    state = make_state(
+        {
+            Position(2, 0).index: rat,
+            Position(2, 1).index: elephant,
+            Position(8, 6).index: Piece(Side.RED, PieceType.LION),
+        }
+    )
+
+    result = AlphaBetaAI(10_000, SearchConfig.hard(), node_limit=0).choose_move(state)
+
+    assert result.depth == 0
+    assert result.move is not None
+    assert result.move.origin == Position(2, 0).index
+    assert result.move.destination == Position(2, 1).index
