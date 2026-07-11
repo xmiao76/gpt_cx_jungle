@@ -122,7 +122,7 @@ git commit -m "docs: record current build provenance"
 - Modify: `release/README.txt`
 - Modify: `release/Jungle.zip`
 
-- [ ] **Step 1: Rebuild the release and run its packaged smoke test**
+- [x] **Step 1: Rebuild the release and run its packaged smoke test**
 
 Run:
 
@@ -132,7 +132,7 @@ python -m tools.package_release
 
 Expected: PyInstaller completes, the packaged executable reports a valid nonzero-turn smoke result, and the command prints `Release created at` followed by the repository release path.
 
-- [ ] **Step 2: Verify generated and archived README metadata**
+- [x] **Step 2: Verify generated and archived README metadata**
 
 Run:
 
@@ -161,7 +161,7 @@ print("release provenance verified")
 
 Expected: `release provenance verified`.
 
-- [ ] **Step 3: Run the full regression suite and static checks**
+- [x] **Step 3: Run the full regression suite and static checks**
 
 Run:
 
@@ -173,14 +173,14 @@ git diff --check
 
 Expected: all tests pass, compilation exits zero, and `git diff --check` produces no output.
 
-- [ ] **Step 4: Commit the regenerated release artifacts**
+- [x] **Step 4: Commit the regenerated release artifacts**
 
 ```powershell
 git add release/README.txt release/Jungle.zip
 git commit -m "build: package current provenance metadata"
 ```
 
-- [ ] **Step 5: Confirm final branch state**
+- [x] **Step 5: Confirm final branch state**
 
 Run:
 
