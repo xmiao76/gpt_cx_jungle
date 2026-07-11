@@ -60,9 +60,14 @@ Run the packaged smoke test directly:
 release\Jungle.exe --smoke-test
 ```
 
-The release folder must contain `Jungle.exe`, bundled runtime files, `Jungle.zip`, and `README.txt`. The release README includes:
+The release folder must contain `Jungle.exe`, bundled runtime files, `Jungle.zip`, and `README.txt`.
 
-- `Model used: gpt-5.5`
+## Build Provenance
+
+- `Model used: GPT 5.6-Sol`
+- `Reasoning effort: Ultra`
 - `Code agent used: Codex`
+
+The same values are included in the generated release README.
 
 Manual packaged-exe validation is tracked in `docs/release-validation.md`.

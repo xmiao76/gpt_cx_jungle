@@ -19,7 +19,7 @@
 - Modify: `README.md`
 - Modify: `docs/prompt-closure-checklist.md`
 
-- [ ] **Step 1: Update generated-README assertions and add a source-README assertion**
+- [x] **Step 1: Update generated-README assertions and add a source-README assertion**
 
 Replace the existing generated disclosure assertions with:
 
@@ -48,7 +48,7 @@ def test_source_readme_contains_required_disclosure() -> None:
     assert "Code agent used: Codex" in content
 ```
 
-- [ ] **Step 2: Run focused tests and confirm they fail for stale or absent metadata**
+- [x] **Step 2: Run focused tests and confirm they fail for stale or absent metadata**
 
 Run:
 
@@ -58,7 +58,7 @@ python -m pytest tests/unit/test_packaging.py::test_build_release_readme_include
 
 Expected: three failures because the model is still `gpt-5.5` and the reasoning-effort line is absent.
 
-- [ ] **Step 3: Update the release provenance constants and generated text**
+- [x] **Step 3: Update the release provenance constants and generated text**
 
 Use these constants and required disclosures in `tools/package_release.py`:
 
@@ -89,7 +89,7 @@ def build_release_readme(
 - Code agent used: {agent_name}
 ```
 
-- [ ] **Step 4: Mirror the exact provenance in repository documentation**
+- [x] **Step 4: Mirror the exact provenance in repository documentation**
 
 Replace the current two-line README disclosure with:
 
@@ -103,13 +103,13 @@ Replace the current two-line README disclosure with:
 
 Update the nested disclosure list in `docs/prompt-closure-checklist.md` to contain the same three exact lines.
 
-- [ ] **Step 5: Run focused tests and confirm they pass**
+- [x] **Step 5: Run focused tests and confirm they pass**
 
 Run the focused command from Step 2.
 
 Expected: `3 passed`.
 
-- [ ] **Step 6: Commit source, tests, and documentation**
+- [x] **Step 6: Commit source, tests, and documentation**
 
 ```powershell
 git add README.md docs/prompt-closure-checklist.md tools/package_release.py tests/unit/test_packaging.py tests/integration/test_packaging_smoke.py

@@ -15,10 +15,12 @@ BUILD = ROOT / "build"
 RELEASE = ROOT / "release"
 SPEC = ROOT / "Jungle.spec"
 RELEASE_ZIP_NAME = "Jungle.zip"
-MODEL_NAME = "gpt-5.5"
+MODEL_NAME = "GPT 5.6-Sol"
+EFFORT_NAME = "Ultra"
 AGENT_NAME = "Codex"
 REQUIRED_DISCLOSURES = (
     f"Model used: {MODEL_NAME}",
+    f"Reasoning effort: {EFFORT_NAME}",
     f"Code agent used: {AGENT_NAME}",
 )
 PRESERVED_RELEASE_NAMES = frozenset({"Capture.PNG", "knownIssue.txt"})
@@ -61,7 +63,11 @@ coll = COLLECT(
 """.strip()
 
 
-def build_release_readme(model_name: str = MODEL_NAME, agent_name: str = AGENT_NAME) -> str:
+def build_release_readme(
+    model_name: str = MODEL_NAME,
+    effort_name: str = EFFORT_NAME,
+    agent_name: str = AGENT_NAME,
+) -> str:
     return f"""Jungle
 
 Launch
@@ -93,6 +99,7 @@ Important Notes
 - The source prompt is preserved as prompt.md in the repository root.
 - Windows Defender may pause first launch briefly while it scans the executable.
 - Model used: {model_name}
+- Reasoning effort: {effort_name}
 - Code agent used: {agent_name}
 """
 
