@@ -158,7 +158,8 @@ def create_release_zip(release_dir: Path = RELEASE) -> Path:
 
 def verify_release_artifacts(release_dir: Path = RELEASE) -> None:
     readme_path = release_dir / "README.txt"
-    readme = readme_path.read_text(encoding="utf-8")
+    readme_bytes = readme_path.read_bytes()
+    readme = readme_bytes.decode("utf-8")
     for required in REQUIRED_DISCLOSURES:
         if required not in readme:
             raise RuntimeError(f"Missing release README requirement: {required}")
@@ -169,9 +170,12 @@ def verify_release_artifacts(release_dir: Path = RELEASE) -> None:
         raise RuntimeError(f"release/{RELEASE_ZIP_NAME} was not created")
     with zipfile.ZipFile(zip_path) as archive:
         names = set(archive.namelist())
-    for required_name in ("Jungle.exe", "README.txt", "_internal/python312.dll", "_internal/VCRUNTIME140.dll"):
-        if required_name not in names:
-            raise RuntimeError(f"release/{RELEASE_ZIP_NAME} is missing {required_name}")
+        for required_name in ("Jungle.exe", "README.txt", "_internal/python312.dll", "_internal/VCRUNTIME140.dll"):
+            if required_name not in names:
+                raise RuntimeError(f"release/{RELEASE_ZIP_NAME} is missing {required_name}")
+        archived_readme = archive.read("README.txt")
+    if archived_readme != readme_bytes:
+        raise RuntimeError(f"release/{RELEASE_ZIP_NAME} README.txt does not match release/README.txt")
     if not (ROOT / "prompt.md").exists():
         raise RuntimeError("prompt.md must remain in the repository root")
 

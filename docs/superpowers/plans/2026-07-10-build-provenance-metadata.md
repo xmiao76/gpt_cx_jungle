@@ -190,3 +190,20 @@ git log --oneline -4
 ```
 
 Expected: a clean `5.5xhigh` worktree with the provenance source commit and regenerated-release commit at the tip.
+
+### Task 3: Enforce Archived README Consistency
+
+**Files:**
+- Modify: `tests/unit/test_packaging.py`
+- Modify: `tools/package_release.py`
+- Modify: `release/Jungle.zip`
+
+- [x] **Step 1: Add a regression that pairs a current outer README with a stale archived README**
+
+- [x] **Step 2: Run the regression and confirm the current validator accepts the mismatch**
+
+- [x] **Step 3: Require the archived README to match `release/README.txt` exactly**
+
+- [x] **Step 4: Run focused and full verification, then rebuild the release**
+
+- [x] **Step 5: Commit the reviewed validation hardening**

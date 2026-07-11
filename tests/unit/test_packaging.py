@@ -105,6 +105,25 @@ def test_verify_release_artifacts_requires_required_statements(tmp_path, monkeyp
         package_release.verify_release_artifacts(release_dir)
 
 
+def test_verify_release_artifacts_rejects_mismatched_archived_readme(tmp_path) -> None:
+    release_dir = tmp_path / "release"
+    internal_dir = release_dir / "_internal"
+    internal_dir.mkdir(parents=True)
+    (release_dir / "Jungle.exe").write_text("binary", encoding="utf-8")
+    (internal_dir / "python312.dll").write_text("dll", encoding="utf-8")
+    (internal_dir / "VCRUNTIME140.dll").write_text("runtime", encoding="utf-8")
+    readme_path = release_dir / "README.txt"
+    readme_path.write_text(
+        package_release.build_release_readme(model_name="gpt-5.5", effort_name="xhigh"),
+        encoding="utf-8",
+    )
+    package_release.create_release_zip(release_dir)
+    readme_path.write_text(package_release.build_release_readme(), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="does not match release/README.txt"):
+        package_release.verify_release_artifacts(release_dir)
+
+
 def test_run_packaged_smoke_executes_release_exe_and_reads_result(tmp_path, monkeypatch) -> None:
     release_dir = tmp_path / "release"
     release_dir.mkdir()
