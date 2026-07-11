@@ -32,11 +32,13 @@ Run tests:
 python -m pytest
 ```
 
-Compare AI strength across baseline, medium, and hard profiles, including fixed positions and head-to-head scenarios:
+Compare AI strength across baseline, medium, and hard profiles. The benchmark gates 11 tactical positions, eight node-limited paired opening games, four conversion games, and Hard's 1.8-second response depth:
 
 ```powershell
 python -m tools.ai_benchmark
 ```
+
+The command exits nonzero if Hard drops below 11/11 tactical positions, 0.50 in paired openings, 0.60 across all match games, depth 4, or the two-second response ceiling.
 
 Regenerate UI assets:
 
@@ -58,9 +60,14 @@ Run the packaged smoke test directly:
 release\Jungle.exe --smoke-test
 ```
 
-The release folder must contain `Jungle.exe`, bundled runtime files, `Jungle.zip`, and `README.txt`. The release README includes:
+The release folder must contain `Jungle.exe`, bundled runtime files, `Jungle.zip`, and `README.txt`.
 
-- `Model used: gpt-5.5`
+## Build Provenance
+
+- `Model used: GPT 5.6-Sol`
+- `Reasoning effort: Ultra`
 - `Code agent used: Codex`
+
+The same values are included in the generated release README.
 
 Manual packaged-exe validation is tracked in `docs/release-validation.md`.

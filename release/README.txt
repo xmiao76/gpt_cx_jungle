@@ -28,5 +28,6 @@ Important Notes
 - The packaged build also supports Jungle.exe --smoke-test for release validation.
 - The source prompt is preserved as prompt.md in the repository root.
 - Windows Defender may pause first launch briefly while it scans the executable.
-- Model used: gpt-5.5
+- Model used: GPT 5.6-Sol
+- Reasoning effort: Ultra
 - Code agent used: Codex

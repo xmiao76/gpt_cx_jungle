@@ -28,6 +28,8 @@ Use this checklist on the packaged executable before calling the prompt complete
 
 ## Latest Evidence
 
-- Automated tests: `python -m pytest`
-- Packaged smoke: `release/Jungle.exe --smoke-test`
+- Automated tests: `113 passed` with `python -m pytest -q` on 2026-07-10.
+- AI benchmark: Hard `11/11` tactical positions, `0.50` paired-opening score, `1.00` conversion score, `0.67` combined score, and depth 4 in 1800 ms.
+- Packaged smoke: exit code 0, `winner=none`, `result=ongoing`, `turns=200` from `release/Jungle.exe --smoke-test`.
+- Release archive: verified `Jungle.exe`, runtime DLLs, `README.txt`, `Capture.PNG`, and `knownIssue.txt` in `release/Jungle.zip`.
 - Manual packaged-exe checklist: pending for each release candidate.

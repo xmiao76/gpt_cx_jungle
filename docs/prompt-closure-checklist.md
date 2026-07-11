@@ -9,5 +9,6 @@
 - `tools/package_release.py` runs packaged `release/Jungle.exe --smoke-test` before reporting success.
 - `docs/release-validation.md` is used for packaged-exe manual gameplay validation.
 - The release folder contains `Jungle.exe`, bundled runtime files, and a README with:
-  - `Model used: gpt-5.5`
+  - `Model used: GPT 5.6-Sol`
+  - `Reasoning effort: Ultra`
   - `Code agent used: Codex`

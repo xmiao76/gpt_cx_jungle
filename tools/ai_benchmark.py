@@ -17,8 +17,9 @@ from jungle.engine import Game
 
 
 FIXED_TIME_MS = 80
-HEAD_TO_HEAD_TIME_MS = 120
-HEAD_TO_HEAD_TURN_CAP = 80
+MATCH_TIME_MS = 5_000
+MATCH_NODE_LIMIT = 300
+MATCH_TURN_CAP = 60
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,12 @@ class HeadToHeadScenario:
     name: str
     state: GameState
     stronger_side: Side
+
+
+@dataclass(frozen=True, slots=True)
+class OpeningScenario:
+    name: str
+    moves: tuple[tuple[int, int], ...]
 
 
 def make_state(pieces: dict[int, Piece], side_to_move: Side = Side.BLUE) -> GameState:
@@ -114,7 +121,7 @@ def positions() -> list[BenchmarkPosition]:
             frozenset({Position(2, 1).index}),
         ),
         BenchmarkPosition(
-            "rat_takes_elephant_from_right",
+            "rat_wins_den_race_from_right",
             make_state(
                 {
                     Position(2, 2).index: Piece(Side.BLUE, PieceType.RAT),
@@ -122,10 +129,10 @@ def positions() -> list[BenchmarkPosition]:
                     Position(8, 6).index: Piece(Side.RED, PieceType.LION),
                 }
             ),
-            frozenset({Position(2, 1).index}),
+            frozenset({Position(1, 2).index}),
         ),
         BenchmarkPosition(
-            "rat_takes_elephant_from_above",
+            "rat_wins_den_race_from_above",
             make_state(
                 {
                     Position(1, 1).index: Piece(Side.BLUE, PieceType.RAT),
@@ -133,7 +140,7 @@ def positions() -> list[BenchmarkPosition]:
                     Position(8, 6).index: Piece(Side.RED, PieceType.LION),
                 }
             ),
-            frozenset({Position(2, 1).index}),
+            frozenset({Position(1, 2).index}),
         ),
         BenchmarkPosition(
             "lion_uses_three_square_span",
@@ -273,22 +280,75 @@ def head_to_head_scenarios() -> list[HeadToHeadScenario]:
     ]
 
 
+def opening_scenarios() -> list[OpeningScenario]:
+    return [
+        OpeningScenario(
+            "flank_rats",
+            (
+                (Position(6, 6).index, Position(5, 6).index),
+                (Position(2, 0).index, Position(3, 0).index),
+            ),
+        ),
+        OpeningScenario(
+            "center_wolves",
+            (
+                (Position(6, 2).index, Position(6, 3).index),
+                (Position(2, 4).index, Position(2, 3).index),
+            ),
+        ),
+        OpeningScenario(
+            "heavy_wings",
+            (
+                (Position(6, 0).index, Position(5, 0).index),
+                (Position(2, 6).index, Position(3, 6).index),
+            ),
+        ),
+        OpeningScenario(
+            "minor_development",
+            (
+                (Position(7, 1).index, Position(6, 1).index),
+                (Position(1, 5).index, Position(2, 5).index),
+            ),
+        ),
+    ]
+
+
+def build_opening_state(scenario: OpeningScenario) -> GameState:
+    game = Game()
+    for origin, destination in scenario.moves:
+        game.apply_coordinates(origin, destination)
+    return game.state.copy()
+
+
+def combined_match_score(opening_scores: list[float], conversion_scores: list[float]) -> float:
+    scores = opening_scores + conversion_scores
+    return sum(scores) / len(scores) if scores else 0.0
+
+
 def score_game(
     stronger_side: Side,
     stronger_config: SearchConfig,
     baseline_config: SearchConfig,
     initial_state: GameState | None = None,
+    *,
+    node_limit: int = MATCH_NODE_LIMIT,
+    turn_cap: int = MATCH_TURN_CAP,
 ) -> float:
     game = Game(initial_state)
     turns = 0
-    while game.state.winner is None and turns < HEAD_TO_HEAD_TURN_CAP:
+    while game.state.winner is None and turns < turn_cap:
+        moves = game.list_moves()
+        if not moves:
+            break
         if game.state.side_to_move is stronger_side:
             config = stronger_config
         else:
             config = baseline_config
-        result = AlphaBetaAI(HEAD_TO_HEAD_TIME_MS, config).choose_move(game.state)
+        result = AlphaBetaAI(MATCH_TIME_MS, config, node_limit=node_limit).choose_move(game.state)
         if result.move is None:
-            break
+            raise RuntimeError("AI returned no move for an ongoing game.")
+        if result.move not in moves:
+            raise RuntimeError(f"AI returned illegal move {result.move.origin}->{result.move.destination}.")
         game.apply_move(result.move)
         turns += 1
     if game.state.winner is stronger_side:
@@ -298,46 +358,82 @@ def score_game(
     return 0.5
 
 
-def run_initial_head_to_head(stronger_config: SearchConfig, baseline_config: SearchConfig) -> float:
-    scores = [
-        score_game(Side.BLUE, stronger_config, baseline_config),
-        score_game(Side.RED, stronger_config, baseline_config),
-        score_game(Side.BLUE, stronger_config, baseline_config),
-        score_game(Side.RED, stronger_config, baseline_config),
-    ]
-    score = sum(scores) / len(scores)
+def validate_benchmark(
+    hard: ConfigStats,
+    opening_scores: list[float],
+    conversion_scores: list[float],
+    responsive: SearchResult,
+) -> None:
+    if hard.passed != hard.total:
+        raise SystemExit(f"hard config failed fixed positions: {hard.passed}/{hard.total}")
+    opening_score = sum(opening_scores) / len(opening_scores) if opening_scores else 0.0
+    if opening_score < 0.50:
+        raise SystemExit(f"paired opening score too low: {opening_score:.2f}")
+    combined = combined_match_score(opening_scores, conversion_scores)
+    if combined < 0.60:
+        raise SystemExit(f"combined match score too low: {combined:.2f}")
+    conversion_score = sum(conversion_scores) / len(conversion_scores) if conversion_scores else 0.0
+    if conversion_score < 0.75:
+        raise SystemExit(f"conversion score too low: {conversion_score:.2f}")
+    if responsive.move not in Game().list_moves():
+        raise SystemExit("hard responsiveness returned an illegal move")
+    if responsive.depth < 4:
+        raise SystemExit(f"hard responsiveness depth too low: {responsive.depth}")
+    if responsive.elapsed_ms > 2_000:
+        raise SystemExit(f"hard responsiveness exceeded 2000 ms: {responsive.elapsed_ms:.0f}")
+
+
+def run_paired_openings(stronger_config: SearchConfig, baseline_config: SearchConfig) -> list[float]:
+    scores: list[float] = []
     print(
-        "\ninitial_head_to_head "
+        "\npaired_openings "
         f"stronger={stronger_config.label} baseline={baseline_config.label} "
-        f"time_ms={HEAD_TO_HEAD_TIME_MS} turn_cap={HEAD_TO_HEAD_TURN_CAP} "
-        f"scores={scores} score={score:.2f}"
+        f"node_limit={MATCH_NODE_LIMIT} turn_cap={MATCH_TURN_CAP}"
     )
-    return score
+    for scenario in opening_scenarios():
+        state = build_opening_state(scenario)
+        for stronger_side in (Side.BLUE, Side.RED):
+            score = score_game(stronger_side, stronger_config, baseline_config, state)
+            scores.append(score)
+            print(f"  {scenario.name}: score={score:.2f} stronger_side={stronger_side.value}")
+    total = sum(scores) / len(scores)
+    print(f"  paired_opening_score={total:.2f}")
+    return scores
 
 
-def run_seeded_head_to_head(stronger_config: SearchConfig, baseline_config: SearchConfig) -> float:
+def run_conversion_games(stronger_config: SearchConfig, baseline_config: SearchConfig) -> list[float]:
     scenarios = head_to_head_scenarios()
     scores: list[float] = []
     print(
-        "\nseeded_head_to_head "
+        "\nconversion_games "
         f"stronger={stronger_config.label} baseline={baseline_config.label} "
-        f"time_ms={HEAD_TO_HEAD_TIME_MS} turn_cap={HEAD_TO_HEAD_TURN_CAP}"
+        f"node_limit={MATCH_NODE_LIMIT} turn_cap={MATCH_TURN_CAP}"
     )
     for scenario in scenarios:
         score = score_game(scenario.stronger_side, stronger_config, baseline_config, scenario.state)
         scores.append(score)
         print(f"  {scenario.name}: score={score:.2f} stronger_side={scenario.stronger_side.value}")
     total = sum(scores) / len(scores)
-    print(f"  seeded_score={total:.2f}")
-    return total
+    print(f"  conversion_score={total:.2f}")
+    return scores
+
+
+def run_responsiveness_check(config: SearchConfig) -> SearchResult:
+    result = AlphaBetaAI(1_800, config).choose_move(Game().state)
+    print(
+        "\nresponsiveness "
+        f"config={config.label} depth={result.depth} nodes={result.nodes} elapsed_ms={result.elapsed_ms:.0f}"
+    )
+    return result
 
 
 def print_summary(
     baseline: ConfigStats,
     medium: ConfigStats,
     hard: ConfigStats,
-    initial_head_to_head_score: float,
-    seeded_head_to_head_score: float,
+    opening_scores: list[float],
+    conversion_scores: list[float],
+    responsive: SearchResult,
 ) -> None:
     print("\nsummary")
     for stats in (baseline, medium, hard):
@@ -349,10 +445,13 @@ def print_summary(
             f"avg_depth={avg_depth:.1f} avg_nodes={avg_nodes:.0f}"
         )
     print(f"  hard_fixed_position_delta={hard.passed - baseline.passed}")
-    combined_head_to_head = (initial_head_to_head_score + seeded_head_to_head_score) / 2
-    print(f"  hard_initial_head_to_head_score={initial_head_to_head_score:.2f}")
-    print(f"  hard_seeded_head_to_head_score={seeded_head_to_head_score:.2f}")
-    print(f"  hard_combined_head_to_head_score={combined_head_to_head:.2f}")
+    opening_score = sum(opening_scores) / len(opening_scores)
+    conversion_score = sum(conversion_scores) / len(conversion_scores)
+    print(f"  hard_paired_opening_score={opening_score:.2f}")
+    print(f"  hard_conversion_score={conversion_score:.2f}")
+    print(f"  hard_combined_match_score={combined_match_score(opening_scores, conversion_scores):.2f}")
+    print(f"  hard_response_depth={responsive.depth}")
+    print(f"  hard_response_elapsed_ms={responsive.elapsed_ms:.0f}")
 
 
 def main() -> None:
@@ -368,9 +467,11 @@ def main() -> None:
     baseline = evaluate_fixed_positions(baseline_config)
     medium = evaluate_fixed_positions(medium_config)
     hard = evaluate_fixed_positions(hard_config)
-    initial_head_to_head_score = run_initial_head_to_head(hard_config, baseline_config)
-    seeded_head_to_head_score = run_seeded_head_to_head(hard_config, baseline_config)
-    print_summary(baseline, medium, hard, initial_head_to_head_score, seeded_head_to_head_score)
+    opening_scores = run_paired_openings(hard_config, baseline_config)
+    conversion_scores = run_conversion_games(hard_config, baseline_config)
+    responsive = run_responsiveness_check(hard_config)
+    print_summary(baseline, medium, hard, opening_scores, conversion_scores, responsive)
+    validate_benchmark(hard, opening_scores, conversion_scores, responsive)
 
 
 if __name__ == "__main__":

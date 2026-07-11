@@ -15,12 +15,15 @@ BUILD = ROOT / "build"
 RELEASE = ROOT / "release"
 SPEC = ROOT / "Jungle.spec"
 RELEASE_ZIP_NAME = "Jungle.zip"
-MODEL_NAME = "gpt-5.5"
+MODEL_NAME = "GPT 5.6-Sol"
+EFFORT_NAME = "Ultra"
 AGENT_NAME = "Codex"
 REQUIRED_DISCLOSURES = (
     f"Model used: {MODEL_NAME}",
+    f"Reasoning effort: {EFFORT_NAME}",
     f"Code agent used: {AGENT_NAME}",
 )
+PRESERVED_RELEASE_NAMES = frozenset({"Capture.PNG", "knownIssue.txt"})
 SPEC_TEMPLATE = """
 a = Analysis(
     ['src/jungle/__main__.py'],
@@ -60,7 +63,11 @@ coll = COLLECT(
 """.strip()
 
 
-def build_release_readme(model_name: str = MODEL_NAME, agent_name: str = AGENT_NAME) -> str:
+def build_release_readme(
+    model_name: str = MODEL_NAME,
+    effort_name: str = EFFORT_NAME,
+    agent_name: str = AGENT_NAME,
+) -> str:
     return f"""Jungle
 
 Launch
@@ -92,6 +99,7 @@ Important Notes
 - The source prompt is preserved as prompt.md in the repository root.
 - Windows Defender may pause first launch briefly while it scans the executable.
 - Model used: {model_name}
+- Reasoning effort: {effort_name}
 - Code agent used: {agent_name}
 """
 
@@ -102,8 +110,18 @@ def write_spec(spec_path: Path = SPEC) -> None:
 
 def clean(paths: tuple[Path, ...] = (DIST, BUILD, RELEASE)) -> None:
     for path in paths:
-        if path.exists():
+        if not path.exists():
+            continue
+        if path.name.casefold() != "release":
             shutil.rmtree(path)
+            continue
+        for child in path.iterdir():
+            if child.name in PRESERVED_RELEASE_NAMES:
+                continue
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
 
 
 def generate_assets() -> None:
@@ -117,7 +135,7 @@ def build_bundle(spec_path: Path = SPEC) -> Path:
 
 
 def assemble_release(bundle_dir: Path, release_dir: Path = RELEASE) -> None:
-    shutil.copytree(bundle_dir, release_dir)
+    shutil.copytree(bundle_dir, release_dir, dirs_exist_ok=True)
 
 
 def write_release_readme(release_dir: Path = RELEASE) -> Path:
@@ -140,7 +158,8 @@ def create_release_zip(release_dir: Path = RELEASE) -> Path:
 
 def verify_release_artifacts(release_dir: Path = RELEASE) -> None:
     readme_path = release_dir / "README.txt"
-    readme = readme_path.read_text(encoding="utf-8")
+    readme_bytes = readme_path.read_bytes()
+    readme = readme_bytes.decode("utf-8")
     for required in REQUIRED_DISCLOSURES:
         if required not in readme:
             raise RuntimeError(f"Missing release README requirement: {required}")
@@ -151,9 +170,12 @@ def verify_release_artifacts(release_dir: Path = RELEASE) -> None:
         raise RuntimeError(f"release/{RELEASE_ZIP_NAME} was not created")
     with zipfile.ZipFile(zip_path) as archive:
         names = set(archive.namelist())
-    for required_name in ("Jungle.exe", "README.txt", "_internal/python312.dll", "_internal/VCRUNTIME140.dll"):
-        if required_name not in names:
-            raise RuntimeError(f"release/{RELEASE_ZIP_NAME} is missing {required_name}")
+        for required_name in ("Jungle.exe", "README.txt", "_internal/python312.dll", "_internal/VCRUNTIME140.dll"):
+            if required_name not in names:
+                raise RuntimeError(f"release/{RELEASE_ZIP_NAME} is missing {required_name}")
+        archived_readme = archive.read("README.txt")
+    if archived_readme != readme_bytes:
+        raise RuntimeError(f"release/{RELEASE_ZIP_NAME} README.txt does not match release/README.txt")
     if not (ROOT / "prompt.md").exists():
         raise RuntimeError("prompt.md must remain in the repository root")
 

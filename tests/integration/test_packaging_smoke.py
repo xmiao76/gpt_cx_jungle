@@ -14,5 +14,13 @@ def test_prompt_artifacts_exist() -> None:
 
 def test_release_readme_template_contains_required_disclosure() -> None:
     content = build_release_readme()
-    assert "Model used: gpt-5.5" in content
+    assert "Model used: GPT 5.6-Sol" in content
+    assert "Reasoning effort: Ultra" in content
+    assert "Code agent used: Codex" in content
+
+
+def test_source_readme_contains_required_disclosure() -> None:
+    content = Path("README.md").read_text(encoding="utf-8")
+    assert "Model used: GPT 5.6-Sol" in content
+    assert "Reasoning effort: Ultra" in content
     assert "Code agent used: Codex" in content
