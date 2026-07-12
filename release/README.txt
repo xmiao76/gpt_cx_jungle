@@ -25,6 +25,7 @@ Controls
 
 Important Notes
 - This build follows the documented ruleset in docs/ruleset.md.
+- Hard difficulty includes a checksummed exact two-piece endgame tablebase generated for this build's rules.
 - The packaged build also supports Jungle.exe --smoke-test for release validation.
 - The source prompt is preserved as prompt.md in the repository root.
 - Windows Defender may pause first launch briefly while it scans the executable.

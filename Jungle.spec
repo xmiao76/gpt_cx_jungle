@@ -2,7 +2,10 @@ a = Analysis(
     ['src/jungle/__main__.py'],
     pathex=['src'],
     binaries=[],
-    datas=[('src/jungle/ui/assets', 'jungle/ui/assets')],
+    datas=[
+        ('src/jungle/ui/assets', 'jungle/ui/assets'),
+        ('src/jungle/ai/data', 'jungle/ai/data'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

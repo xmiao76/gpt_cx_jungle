@@ -29,7 +29,10 @@ a = Analysis(
     ['src/jungle/__main__.py'],
     pathex=['src'],
     binaries=[],
-    datas=[('src/jungle/ui/assets', 'jungle/ui/assets')],
+    datas=[
+        ('src/jungle/ui/assets', 'jungle/ui/assets'),
+        ('src/jungle/ai/data', 'jungle/ai/data'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -95,6 +98,7 @@ Controls
 
 Important Notes
 - This build follows the documented ruleset in docs/ruleset.md.
+- Hard difficulty includes a checksummed exact two-piece endgame tablebase generated for this build's rules.
 - The packaged build also supports Jungle.exe --smoke-test for release validation.
 - The source prompt is preserved as prompt.md in the repository root.
 - Windows Defender may pause first launch briefly while it scans the executable.
@@ -126,6 +130,14 @@ def clean(paths: tuple[Path, ...] = (DIST, BUILD, RELEASE)) -> None:
 
 def generate_assets() -> None:
     subprocess.run([sys.executable, "-m", "tools.generate_ui_assets"], cwd=ROOT, check=True)
+
+
+def verify_tablebase_asset() -> None:
+    subprocess.run(
+        [sys.executable, "-m", "tools.generate_tablebase", "--check"],
+        cwd=ROOT,
+        check=True,
+    )
 
 
 def build_bundle(spec_path: Path = SPEC) -> Path:
@@ -170,7 +182,13 @@ def verify_release_artifacts(release_dir: Path = RELEASE) -> None:
         raise RuntimeError(f"release/{RELEASE_ZIP_NAME} was not created")
     with zipfile.ZipFile(zip_path) as archive:
         names = set(archive.namelist())
-        for required_name in ("Jungle.exe", "README.txt", "_internal/python312.dll", "_internal/VCRUNTIME140.dll"):
+        for required_name in (
+            "Jungle.exe",
+            "README.txt",
+            "_internal/python312.dll",
+            "_internal/VCRUNTIME140.dll",
+            "_internal/jungle/ai/data/two_piece_v1.jgtb",
+        ):
             if required_name not in names:
                 raise RuntimeError(f"release/{RELEASE_ZIP_NAME} is missing {required_name}")
         archived_readme = archive.read("README.txt")
@@ -183,6 +201,7 @@ def verify_release_artifacts(release_dir: Path = RELEASE) -> None:
 def main() -> None:
     clean()
     generate_assets()
+    verify_tablebase_asset()
     built = build_bundle()
     assemble_release(built)
     write_release_readme()

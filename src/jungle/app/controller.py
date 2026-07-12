@@ -141,7 +141,13 @@ class AppController:
         def worker() -> None:
             ai = AlphaBetaAI(DIFFICULTY_LIMITS[difficulty], config)
             result = ai.choose_move(state)
-            message = f"Difficulty: {difficulty} | depth {result.depth} | nodes {result.nodes} | {result.elapsed_ms:.0f} ms"
+            message = (
+                f"Difficulty: {difficulty} | depth {result.depth} | nodes {result.nodes} "
+                f"| {result.nodes_per_second:,} nps | TT {result.tt_hits}"
+            )
+            if result.tablebase_hits:
+                message += f" | TB {result.tablebase_hits}"
+            message += f" | {result.elapsed_ms:.0f} ms"
             self.ai_queue.put((token, signature, result.move, message))
 
         threading.Thread(target=worker, daemon=True).start()
@@ -237,7 +243,8 @@ class AppController:
 
 
 def run_smoke_validation() -> int:
-    from jungle.ai import AlphaBetaAI
+    from jungle.ai import AlphaBetaAI, SearchConfig
+    from jungle.domain import Piece, PieceType, Position
     from jungle.engine import Game
 
     game = Game()
@@ -251,6 +258,22 @@ def run_smoke_validation() -> int:
             break
         game.apply_move(result.move)
         turns += 1
+
+    hard_game = Game()
+    hard_result = AlphaBetaAI(
+        10_000,
+        SearchConfig.hard(),
+        node_limit=1_000,
+    ).choose_move(hard_game.state)
+    hard_legal = hard_result.move in hard_game.list_moves()
+
+    tablebase_board = [None] * 63
+    tablebase_board[Position(4, 0).index] = Piece(Side.BLUE, PieceType.CAT)
+    tablebase_board[Position(4, 6).index] = Piece(Side.RED, PieceType.DOG)
+    tablebase_state = GameState(board=tablebase_board, side_to_move=Side.BLUE)
+    tablebase_result = AlphaBetaAI(300, SearchConfig.hard()).choose_move(tablebase_state)
+    tablebase_legal = tablebase_result.move in Game(tablebase_state).list_moves()
+
     output = Path("release_smoke_result.txt")
     output.write_text(
         "\n".join(
@@ -258,11 +281,16 @@ def run_smoke_validation() -> int:
                 f"winner={game.state.winner.value if game.state.winner else 'none'}",
                 f"result={game.state.result.value}",
                 f"turns={turns}",
+                f"hard_legal={str(hard_legal).lower()}",
+                f"hard_depth={hard_result.depth}",
+                f"hard_nodes={hard_result.nodes}",
+                f"tablebase_legal={str(tablebase_legal).lower()}",
+                f"tablebase_hits={tablebase_result.tablebase_hits}",
             ]
         ),
         encoding="utf-8",
     )
-    return 0 if turns > 0 else 1
+    return 0 if turns > 0 and hard_legal and tablebase_legal and tablebase_result.tablebase_hits > 0 else 1
 
 
 def run_window_fit_probe(startup_geometry: str, resize_geometry: str) -> int:

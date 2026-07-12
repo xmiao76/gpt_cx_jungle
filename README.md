@@ -8,7 +8,7 @@ Desktop Jungle / Dou Shou Qi game for Windows with a Tkinter GUI, illustrated bo
 python -m jungle
 ```
 
-The human player controls Blue by default. Use **New Game** to choose AI difficulty and whether the player or AI starts.
+The human player controls Blue by default. Use **New Game** to choose AI difficulty and whether the player or AI starts. Hard uses a compact make/unmake search core, incremental Zobrist hashing, a fixed-size transposition table, bounded quiescence search, and an exact two-piece endgame tablebase.
 
 ## Gameplay
 
@@ -32,13 +32,19 @@ Run tests:
 python -m pytest
 ```
 
-Compare AI strength across baseline, medium, and hard profiles. The benchmark gates 11 tactical positions, eight node-limited paired opening games, four conversion games, and Hard's 1.8-second response depth:
+Compare AI strength across baseline, medium, and hard profiles. The benchmark gates 20 tactical/endgame positions, 24 paired opening games from 12 distinct openings, four conversion games, threefold-repetition adjudication, per-color results, decisiveness, and Hard's 1.8-second response depth. Match games use deterministic node budgets with a conservative 3:1 Hard-to-Baseline allocation to model the compact core's measured throughput advantage:
 
 ```powershell
 python -m tools.ai_benchmark
 ```
 
-The command exits nonzero if Hard drops below 11/11 tactical positions, 0.50 in paired openings, 0.60 across all match games, depth 4, or the two-second response ceiling.
+The command exits nonzero if Hard drops below 20/20 tactical/endgame positions, 0.60 in paired openings, 0.50 with either color, a 0.25 decisive-game rate, 0.75 in conversion games, depth 6, or the two-second response ceiling.
+
+Verify that the committed two-piece tablebase matches the engine rules and checksum:
+
+```powershell
+python -m tools.generate_tablebase --check
+```
 
 Regenerate UI assets:
 
@@ -60,7 +66,7 @@ Run the packaged smoke test directly:
 release\Jungle.exe --smoke-test
 ```
 
-The release folder must contain `Jungle.exe`, bundled runtime files, `Jungle.zip`, and `README.txt`.
+The release folder must contain `Jungle.exe`, bundled runtime and tablebase files, `Jungle.zip`, and `README.txt`.
 
 ## Build Provenance
 
