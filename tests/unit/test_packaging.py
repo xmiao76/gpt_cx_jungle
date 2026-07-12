@@ -56,6 +56,26 @@ def test_write_spec_uses_static_local_package_resolution(tmp_path) -> None:
     assert "collect_submodules" not in content
     assert "hiddenimports=[]" in content
     assert "pathex=['src']" in content
+    assert "src/jungle/ai/data" in content
+
+
+def test_verify_tablebase_asset_checks_committed_data(monkeypatch) -> None:
+    calls: list[tuple[list[str], object, bool]] = []
+
+    def fake_run(command, cwd, check):
+        calls.append((command, cwd, check))
+
+    monkeypatch.setattr(package_release.subprocess, "run", fake_run)
+
+    package_release.verify_tablebase_asset()
+
+    assert calls == [
+        (
+            [package_release.sys.executable, "-m", "tools.generate_tablebase", "--check"],
+            package_release.ROOT,
+            True,
+        )
+    ]
 
 
 def test_clean_preserves_user_release_evidence(tmp_path) -> None:
@@ -112,6 +132,9 @@ def test_verify_release_artifacts_rejects_mismatched_archived_readme(tmp_path) -
     (release_dir / "Jungle.exe").write_text("binary", encoding="utf-8")
     (internal_dir / "python312.dll").write_text("dll", encoding="utf-8")
     (internal_dir / "VCRUNTIME140.dll").write_text("runtime", encoding="utf-8")
+    tablebase = internal_dir / "jungle" / "ai" / "data" / "two_piece_v1.jgtb"
+    tablebase.parent.mkdir(parents=True)
+    tablebase.write_text("tablebase", encoding="utf-8")
     readme_path = release_dir / "README.txt"
     readme_path.write_text(
         package_release.build_release_readme(model_name="gpt-5.5", effort_name="xhigh"),
@@ -135,7 +158,11 @@ def test_run_packaged_smoke_executes_release_exe_and_reads_result(tmp_path, monk
     def fake_run(command: list[str], cwd: Path, check: bool) -> None:
         assert check is True
         calls.append((command, cwd))
-        result.write_text("winner=blue\nresult=den_entry\nturns=42", encoding="utf-8")
+        result.write_text(
+            "winner=blue\nresult=den_entry\nturns=42\n"
+            "hard_legal=true\ntablebase_legal=true\ntablebase_hits=1",
+            encoding="utf-8",
+        )
 
     monkeypatch.setattr(smoke_release.subprocess, "run", fake_run)
 
@@ -184,6 +211,7 @@ def test_package_release_main_runs_packaged_smoke_before_verification(monkeypatc
 
     monkeypatch.setattr(package_release, "clean", lambda: order.append("clean"))
     monkeypatch.setattr(package_release, "generate_assets", lambda: order.append("assets"))
+    monkeypatch.setattr(package_release, "verify_tablebase_asset", lambda: order.append("tablebase"))
     monkeypatch.setattr(package_release, "build_bundle", lambda: order.append("build") or (tmp_path / "bundle"))
     monkeypatch.setattr(package_release, "assemble_release", lambda bundle: order.append(f"assemble:{bundle.name}"))
     monkeypatch.setattr(package_release, "write_release_readme", lambda: order.append("readme") or (tmp_path / "README.txt"))
@@ -193,4 +221,14 @@ def test_package_release_main_runs_packaged_smoke_before_verification(monkeypatc
 
     package_release.main()
 
-    assert order == ["clean", "assets", "build", "assemble:bundle", "readme", "smoke", "zip", "verify"]
+    assert order == [
+        "clean",
+        "assets",
+        "tablebase",
+        "build",
+        "assemble:bundle",
+        "readme",
+        "smoke",
+        "zip",
+        "verify",
+    ]

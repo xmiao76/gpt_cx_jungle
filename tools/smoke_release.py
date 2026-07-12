@@ -36,6 +36,16 @@ def validate_smoke_result(result_file: Path) -> None:
         raise SystemExit("Smoke test did not write a numeric turns value") from exc
     if turns <= 0:
         raise SystemExit("Smoke test did not play any turns")
+    if values.get("hard_legal") != "true":
+        raise SystemExit("Packaged Hard engine did not return a legal move")
+    if values.get("tablebase_legal") != "true":
+        raise SystemExit("Packaged tablebase did not return a legal move")
+    try:
+        tablebase_hits = int(values.get("tablebase_hits", ""))
+    except ValueError as exc:
+        raise SystemExit("Packaged smoke did not write numeric tablebase hits") from exc
+    if tablebase_hits <= 0:
+        raise SystemExit("Packaged Hard engine did not probe the bundled tablebase")
 
 
 def run_packaged_smoke(release_dir: Path) -> Path:

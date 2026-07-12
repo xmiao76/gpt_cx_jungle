@@ -45,6 +45,10 @@ class SearchResult:
     depth: int
     nodes: int
     elapsed_ms: float
+    principal_variation: tuple[Move, ...] = ()
+    nodes_per_second: int = 0
+    tt_hits: int = 0
+    tablebase_hits: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +76,8 @@ class SearchConfig:
     threat_weight: int = 0
     use_principal_variation_search: bool = False
     use_cycle_detection: bool = False
+    use_compact_core: bool = False
+    transposition_table_size: int = 262_144
 
     @staticmethod
     def baseline() -> "SearchConfig":
@@ -103,6 +109,8 @@ class SearchConfig:
             threat_weight=1,
             use_principal_variation_search=True,
             use_cycle_detection=True,
+            use_compact_core=True,
+            aspiration_window=160,
         )
 
 
@@ -134,6 +142,10 @@ class AlphaBetaAI:
         self.path_counts: Counter[tuple] = Counter()
 
     def choose_move(self, state: GameState) -> SearchResult:
+        if self.config.use_compact_core:
+            from .fast_search import CompactSearch
+
+            return CompactSearch(self.time_limit_ms, self.config, self.node_limit).choose_move(state)
         self.deadline = time.perf_counter() + self.time_limit_ms / 1000.0
         self.nodes = 0
         self.tt.clear()
@@ -154,7 +166,14 @@ class AlphaBetaAI:
         tactical = self.find_forced_tactical_move(state)
         if tactical is not None:
             elapsed_ms = (time.perf_counter() - start) * 1000
-            return SearchResult(tactical, self.evaluate(self.apply(state, tactical), state.side_to_move), 1, self.nodes, elapsed_ms)
+            return SearchResult(
+                tactical,
+                self.evaluate(self.apply(state, tactical), state.side_to_move),
+                1,
+                self.nodes,
+                elapsed_ms,
+                principal_variation=(tactical,),
+            )
         for depth in range(1, self.config.max_depth + 1):
             try:
                 self._check_limits()
@@ -179,7 +198,17 @@ class AlphaBetaAI:
             ordered = self.order_moves(state, moves) if moves else []
             best_move = ordered[0] if ordered else None
             best_score = self.evaluate(state, state.side_to_move)
-        return SearchResult(best_move, int(best_score), completed_depth, self.nodes, elapsed_ms)
+        nps = int(self.nodes * 1_000 / elapsed_ms) if elapsed_ms > 0 else 0
+        pv = () if best_move is None else (best_move,)
+        return SearchResult(
+            best_move,
+            int(best_score),
+            completed_depth,
+            self.nodes,
+            elapsed_ms,
+            principal_variation=pv,
+            nodes_per_second=nps,
+        )
 
     def find_forced_tactical_move(self, state: GameState) -> Move | None:
         own_win = self.find_immediate_win(state, state.side_to_move)
