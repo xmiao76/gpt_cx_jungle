@@ -40,6 +40,8 @@ def validate_smoke_result(result_file: Path) -> None:
         raise SystemExit("Packaged Hard engine did not return a legal move")
     if values.get("tablebase_legal") != "true":
         raise SystemExit("Packaged tablebase did not return a legal move")
+    if values.get("trap_capture_legal") != "true":
+        raise SystemExit("Packaged rules rejected an elephant capturing a rat in its own trap")
     try:
         tablebase_hits = int(values.get("tablebase_hits", ""))
     except ValueError as exc:

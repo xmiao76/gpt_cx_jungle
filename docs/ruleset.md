@@ -26,7 +26,7 @@ The Wikipedia page notes several published variations. This project uses the fol
 
 - A piece may capture an opposing piece of equal or lower effective rank.
 - A rat may capture an elephant only when the rat attacks from land.
-- An elephant may not capture a rat.
+- An elephant may capture a rat only when the rat is in a trap owned by the elephant's side.
 - A rat in water may only capture another rat in water.
 - A piece on land may not capture a rat in water.
 - A rat in water may not capture a piece on land.
@@ -34,7 +34,7 @@ The Wikipedia page notes several published variations. This project uses the fol
 
 ## Explicitly Excluded Variants
 
-- Elephant capturing rat.
+- Elephant capturing an untrapped rat.
 - Universal traps.
 - Leopard river jumping.
 - Lion horizontal jump disabled.

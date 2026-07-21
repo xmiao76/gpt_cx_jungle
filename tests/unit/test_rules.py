@@ -116,7 +116,7 @@ def test_rat_can_capture_elephant_only_from_land() -> None:
     assert not can_capture(water_state, water_rat, adjacent_elephant)
 
 
-def test_elephant_cannot_capture_rat() -> None:
+def test_elephant_cannot_capture_untrapped_rat() -> None:
     elephant = Position(2, 0).index
     rat = Position(2, 1).index
     state = make_state(
@@ -125,6 +125,41 @@ def test_elephant_cannot_capture_rat() -> None:
             rat: Piece(Side.RED, PieceType.RAT),
         }
     )
+    assert not can_capture(state, elephant, rat)
+
+
+def test_elephant_can_capture_enemy_rat_in_its_own_trap() -> None:
+    cases = (
+        (Side.BLUE, Position(8, 1).index, Position(8, 2).index),
+        (Side.RED, Position(0, 1).index, Position(0, 2).index),
+    )
+
+    for side, elephant, trap in cases:
+        rat = Piece(side.opponent, PieceType.RAT)
+        state = make_state(
+            {
+                elephant: Piece(side, PieceType.ELEPHANT),
+                trap: rat,
+            },
+            side_to_move=side,
+        )
+
+        assert can_capture(state, elephant, trap)
+        assert Move(elephant, trap, state.board[elephant], captured=rat) in generate_piece_moves(
+            state, elephant
+        )
+
+
+def test_elephant_cannot_capture_enemy_rat_in_the_rats_own_trap() -> None:
+    elephant = Position(0, 1).index
+    rat = Position(0, 2).index
+    state = make_state(
+        {
+            elephant: Piece(Side.BLUE, PieceType.ELEPHANT),
+            rat: Piece(Side.RED, PieceType.RAT),
+        }
+    )
+
     assert not can_capture(state, elephant, rat)
 
 
@@ -155,7 +190,7 @@ def test_legal_moves_include_rat_capturing_elephant() -> None:
     assert any(move.origin == rat and move.destination == elephant and move.captured is not None for move in moves)
 
 
-def test_legal_moves_exclude_elephant_capturing_rat() -> None:
+def test_legal_moves_exclude_elephant_capturing_untrapped_rat() -> None:
     elephant = Position(2, 0).index
     rat = Position(2, 1).index
     state = make_state(

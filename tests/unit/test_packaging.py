@@ -17,6 +17,13 @@ def test_build_release_readme_includes_required_provenance_statements() -> None:
     assert "Code agent used: Codex" in content
 
 
+def test_build_release_readme_documents_trapped_rat_capture_rule() -> None:
+    content = package_release.build_release_readme()
+
+    assert "An elephant may capture an enemy rat" in content
+    assert "in a trap owned by the elephant's side" in content
+
+
 def test_write_release_readme_creates_expected_file(tmp_path) -> None:
     readme_path = package_release.write_release_readme(tmp_path)
     assert readme_path == tmp_path / "README.txt"
@@ -160,7 +167,8 @@ def test_run_packaged_smoke_executes_release_exe_and_reads_result(tmp_path, monk
         calls.append((command, cwd))
         result.write_text(
             "winner=blue\nresult=den_entry\nturns=42\n"
-            "hard_legal=true\ntablebase_legal=true\ntablebase_hits=1",
+            "hard_legal=true\ntablebase_legal=true\ntablebase_hits=1\n"
+            "trap_capture_legal=true",
             encoding="utf-8",
         )
 
@@ -170,6 +178,19 @@ def test_run_packaged_smoke_executes_release_exe_and_reads_result(tmp_path, monk
 
     assert result_path == result
     assert calls == [([str(exe), "--smoke-test"], release_dir)]
+
+
+def test_validate_smoke_result_rejects_illegal_trapped_rat_capture(tmp_path) -> None:
+    result = tmp_path / "release_smoke_result.txt"
+    result.write_text(
+        "winner=blue\nresult=den_entry\nturns=42\n"
+        "hard_legal=true\ntablebase_legal=true\ntablebase_hits=1\n"
+        "trap_capture_legal=false",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit, match="elephant capturing a rat in its own trap"):
+        smoke_release.validate_smoke_result(result)
 
 
 def test_run_packaged_smoke_rejects_zero_turn_result(tmp_path, monkeypatch) -> None:

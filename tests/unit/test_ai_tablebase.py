@@ -99,6 +99,16 @@ def test_immediate_capture_and_den_entry_have_distance_one(tablebase: TwoPieceTa
 def test_tablebase_obeys_traps_and_project_tiger_jump_restriction(
     tablebase: TwoPieceTablebase,
 ) -> None:
+    trapped_rat = make_state(
+        PieceType.ELEPHANT,
+        Position(8, 1).index,
+        PieceType.RAT,
+        Position(8, 2).index,
+        Side.BLUE,
+    )
+    assert tablebase.probe(trapped_rat).distance == 1
+    assert tablebase.choose_move(trapped_rat).destination == Position(8, 2).index
+
     # A cat can capture an elephant whose effective rank is zero in the blue
     # trap, so the tablebase reports an immediate conversion.
     trapped_elephant = make_state(

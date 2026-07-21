@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from jungle.ai.core import CompactPosition
-from jungle.ai.fast_evaluation import evaluate_compact
+from jungle.ai.fast_evaluation import _can_capture, evaluate_compact
 from jungle.domain import GameState, Piece, PieceType, Position, Side
 
 
@@ -33,3 +33,18 @@ def test_compact_evaluation_changes_perspective_with_turn() -> None:
 
     # Tempo belongs to the mover, so removing it leaves exact antisymmetry.
     assert evaluate_compact(blue) - 12 == -(evaluate_compact(red) - 12)
+
+
+def test_compact_evaluation_recognizes_elephant_capture_of_rat_in_own_trap() -> None:
+    elephant = Position(8, 1).index
+    trap = Position(8, 2).index
+    position = CompactPosition.from_game_state(
+        make_state(
+            {
+                elephant: Piece(Side.BLUE, PieceType.ELEPHANT),
+                trap: Piece(Side.RED, PieceType.RAT),
+            }
+        )
+    )
+
+    assert _can_capture(position, elephant, trap)
