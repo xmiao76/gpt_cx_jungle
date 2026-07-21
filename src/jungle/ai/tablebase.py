@@ -90,7 +90,7 @@ def _rules_manifest() -> bytes:
     """
 
     manifest = {
-        "semantic_rules_version": 1,
+        "semantic_rules_version": 2,
         "board": [9, 7],
         "blue_den": BLUE_DEN,
         "red_den": RED_DEN,
@@ -110,7 +110,8 @@ def _rules_manifest() -> bytes:
             "equal_or_lower_effective_rank": True,
             "enemy_trap_rank": 0,
             "land_rat_captures_elephant": True,
-            "elephant_cannot_capture_rat": True,
+            "elephant_captures_trapped_rat": True,
+            "elephant_cannot_capture_untrapped_rat": True,
             "shore_capture_forbidden": True,
             "water_capture": "rat-versus-rat-only",
         },

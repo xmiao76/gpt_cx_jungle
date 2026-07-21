@@ -394,7 +394,7 @@ class CompactPosition:
         if attacker_kind == RAT and defender_kind == ELEPHANT:
             return not attacker_in_water and not defender_in_water
         if attacker_kind == ELEPHANT and defender_kind == RAT:
-            return False
+            return self._effective_rank(defender_square, defender) == 0
         if attacker_in_water or defender_in_water:
             return (
                 attacker_in_water

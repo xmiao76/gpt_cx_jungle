@@ -60,7 +60,7 @@ def _can_capture(position: CompactPosition, attacker_square: int, defender_squar
     if attacker_kind == 1 and defender_kind == 8:
         return not attacker_water and not defender_water
     if attacker_kind == 8 and defender_kind == 1:
-        return False
+        return _effective_rank(position, defender_square, defender) == 0
     if attacker_water or defender_water:
         return attacker_water and defender_water and attacker_kind == defender_kind == 1
     return _effective_rank(position, attacker_square, attacker) >= _effective_rank(
@@ -150,4 +150,3 @@ def evaluate_compact(position: CompactPosition) -> int:
     # A small tempo term breaks symmetric zeroes without overwhelming real terms.
     absolute += 12 if position.side_to_move == BLUE else -12
     return absolute if position.side_to_move == BLUE else -absolute
-

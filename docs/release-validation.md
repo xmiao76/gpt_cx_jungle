@@ -29,9 +29,9 @@ Use this checklist on the packaged executable before calling the prompt complete
 
 ## Latest Evidence
 
-- Automated tests: `146 passed` with `python -m pytest -q` on 2026-07-11.
-- AI benchmark: Hard `20/20` tactical/endgame positions, `0.812` paired-opening score (`0.708` Blue, `0.917` Red), `0.625` decisive rate, no match losses, `1.000` conversion score, and depth 6 / 32,120 nodes in 1800 ms.
-- Packaged smoke: exit code 0, `winner=blue`, `result=den_entry`, `turns=45`, legal compact-Hard move, and two successful bundled-tablebase probes from `release/Jungle.exe --smoke-test`.
+- Automated tests: `152 passed` with `python -m pytest -q` on 2026-07-20.
+- AI benchmark: Hard `20/20` tactical/endgame positions, `0.812` paired-opening score (`0.708` Blue, `0.917` Red), `0.625` decisive rate, no match losses, `1.000` conversion score, and depth 6 / 34,979 nodes in 1800 ms.
+- Packaged smoke: exit code 0, `winner=blue`, `result=den_entry`, `turns=45`, legal compact-Hard move, two successful bundled-tablebase probes, and a legal elephant capture of an enemy rat in its own trap from `release/Jungle.exe --smoke-test`.
 - Packaged GUI probe: board/panel visibility and board click mapping passed at both `1180x760` startup and `1000x720` resized window dimensions.
 - Release archive: verified `Jungle.exe`, runtime DLLs, `README.txt`, `Capture.PNG`, `knownIssue.txt`, and the checksummed two-piece tablebase in `release/Jungle.zip`.
 - Manual packaged-exe checklist: pending for each release candidate.

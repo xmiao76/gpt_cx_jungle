@@ -10,6 +10,7 @@ Gameplay
 - Lions may jump both river spans; tigers may jump only the 2-square span.
 - Any rat on a river path blocks that jump.
 - Enemy traps reduce the trapped piece to rank 0 while it remains in the trap.
+- An elephant may capture an enemy rat while that rat is in a trap owned by the elephant's side.
 
 Controls
 - Click a blue piece to select it.

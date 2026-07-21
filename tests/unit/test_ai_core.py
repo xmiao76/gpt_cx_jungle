@@ -191,6 +191,23 @@ def test_move_generation_for_either_side_does_not_mutate_position() -> None:
         assert snapshot(position) == before
 
 
+def test_compact_move_generation_allows_elephant_to_capture_rat_in_own_trap() -> None:
+    elephant = Position(8, 1).index
+    trap = Position(8, 2).index
+    state = make_state(
+        {
+            elephant: Piece(Side.BLUE, PieceType.ELEPHANT),
+            trap: Piece(Side.RED, PieceType.RAT),
+        }
+    )
+    position = CompactPosition.from_game_state(state)
+
+    actual = [position.to_public_move(move) for move in position.generate_moves()]
+
+    assert actual == legal_moves(state)
+    assert any(move.origin == elephant and move.destination == trap for move in actual)
+
+
 def test_make_unmake_restores_capture_counts_winner_and_incremental_hash() -> None:
     blue_cat = Piece(Side.BLUE, PieceType.CAT)
     red_rat = Piece(Side.RED, PieceType.RAT)

@@ -274,6 +274,17 @@ def run_smoke_validation() -> int:
     tablebase_result = AlphaBetaAI(300, SearchConfig.hard()).choose_move(tablebase_state)
     tablebase_legal = tablebase_result.move in Game(tablebase_state).list_moves()
 
+    trap_board = [None] * 63
+    elephant = Position(8, 1).index
+    trapped_rat = Position(8, 2).index
+    trap_board[elephant] = Piece(Side.BLUE, PieceType.ELEPHANT)
+    trap_board[trapped_rat] = Piece(Side.RED, PieceType.RAT)
+    trap_state = GameState(board=trap_board, side_to_move=Side.BLUE)
+    trap_capture_legal = any(
+        move.origin == elephant and move.destination == trapped_rat
+        for move in Game(trap_state).list_moves()
+    )
+
     output = Path("release_smoke_result.txt")
     output.write_text(
         "\n".join(
@@ -286,11 +297,20 @@ def run_smoke_validation() -> int:
                 f"hard_nodes={hard_result.nodes}",
                 f"tablebase_legal={str(tablebase_legal).lower()}",
                 f"tablebase_hits={tablebase_result.tablebase_hits}",
+                f"trap_capture_legal={str(trap_capture_legal).lower()}",
             ]
         ),
         encoding="utf-8",
     )
-    return 0 if turns > 0 and hard_legal and tablebase_legal and tablebase_result.tablebase_hits > 0 else 1
+    return (
+        0
+        if turns > 0
+        and hard_legal
+        and tablebase_legal
+        and tablebase_result.tablebase_hits > 0
+        and trap_capture_legal
+        else 1
+    )
 
 
 def run_window_fit_probe(startup_geometry: str, resize_geometry: str) -> int:
