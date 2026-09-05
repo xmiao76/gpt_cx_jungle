@@ -1,0 +1,27 @@
+[package]
+name = "jungle-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "Jungle"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+jungle-engine.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2.11", features = [] }
+rfd = "0.17"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "=0.38.2"
+windows-core = "=0.61.2"

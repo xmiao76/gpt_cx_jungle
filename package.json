@@ -1,0 +1,41 @@
+{
+  "name": "jungle",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.13.0"
+  },
+  "scripts": {
+    "dev": "node scripts/tasks.mjs dev",
+    "dev:desktop": "node scripts/tasks.mjs desktop-dev",
+    "build": "node scripts/tasks.mjs build",
+    "build:wasm": "node scripts/tasks.mjs wasm",
+    "build:desktop": "node scripts/tasks.mjs desktop-build",
+    "test": "node scripts/tasks.mjs test",
+    "test:ui": "vitest run",
+    "test:browser": "playwright test",
+    "test:desktop": "node scripts/desktop-test.mjs",
+    "bench": "node scripts/bench.mjs",
+    "release:verify": "node scripts/release.mjs verify",
+    "deploy:web": "node scripts/release.mjs deploy",
+    "preview": "vite preview --config vite.config.ts"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.11.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@types/node": "24.10.1",
+    "@vitejs/plugin-react": "6.1.1",
+    "@playwright/test": "1.63.0",
+    "vite": "8.2.2",
+    "vitest": "5.0.0",
+    "typescript": "5.9.3",
+    "wrangler": "4.129.0"
+  }
+}

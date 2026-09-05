@@ -1,0 +1,10 @@
+{
+  "identifier": "main",
+  "description": "Core window capabilities for the Jungle desktop application.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}

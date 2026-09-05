@@ -1,0 +1,10 @@
+import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { engineHash } from './artifacts.mjs';
+const corpus = readFileSync('artifacts/corpus.jsonl', 'utf8').replaceAll('\r\n', '\n');
+const result = spawnSync('python', ['scripts/reference-rules.py'], { input: corpus, encoding: 'utf8', windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
+if (result.status !== 0) throw new Error(result.stderr || 'Reference rules validation failed.');
+const report = { ...JSON.parse(result.stdout), engineHash: engineHash(), corpusHash: createHash('sha256').update(corpus).digest('hex'), createdAt: new Date().toISOString() };
+writeFileSync('artifacts/reference-rules.json', JSON.stringify(report, null, 2));
+console.log(JSON.stringify(report));

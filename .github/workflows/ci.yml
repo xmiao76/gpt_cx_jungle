@@ -1,0 +1,70 @@
+name: Jungle verification
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-desktop-and-browser:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.0'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install pinned Rust and browser tools
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.94.1 --profile minimal --component rustfmt,clippy
+          rustup target add wasm32-unknown-unknown --toolchain 1.94.1
+          cargo install wasm-pack --version 0.15.0 --locked
+          cargo install tauri-driver --version 2.0.6 --locked
+          npm ci
+          npx playwright install chrome firefox
+      - name: Rust and UI checks
+        shell: pwsh
+        run: |
+          npm run build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo fmt --all -- --check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm test
+      - name: Build Windows installer
+        run: node scripts/release.mjs package
+      - name: Test packaged desktop before browser verification
+        run: node scripts/release.mjs desktop
+      - name: Browser end-to-end checks
+        run: npm run test:browser
+      - name: Browser smoke, native/WASM parity and independent rules corpus
+        shell: pwsh
+        run: |
+          node scripts/browser-check.mjs chrome
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/browser-check.mjs firefox
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/parity.mjs chrome
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/parity.mjs firefox
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/reference-check.mjs
+      - name: Check reproducible tablebase
+        run: cargo run -p jungle-engine --release --bin jungle-tablebase -- engine/data/two_piece.bin --check
+      - name: Capture verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jungle-verification
+          path: |
+            artifacts/*.json
+            artifacts/screenshots/
+            test-results/
+            release/v1/
+          retention-days: 14
